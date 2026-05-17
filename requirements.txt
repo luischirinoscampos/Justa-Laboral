@@ -3,3 +3,4 @@ google-genai
 st-gsheets-connection
 gspread
 oauth2client
+psycopg2-binary
