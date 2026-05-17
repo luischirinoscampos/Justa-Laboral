@@ -8,11 +8,11 @@ st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layo
 st.title("⚖️ Justa: Tutora Académica Virtual")
 st.caption("Asignatura: Derecho del Trabajo | Profesor Luis Ignacio Chirinos Campos")
 
-# Conexión segura con los secretos de la nube de Streamlit
+# Conexión con los secretos de Streamlit Cloud
 if "gemini_api_key" in st.secrets:
     api_key = st.secrets["gemini_api_key"]
 else:
-    st.error("Falta la API Key de Gemini. Configúrala en los secretos de Streamlit (Advanced Settings).")
+    st.error("Falta la API Key de Gemini. Configúrala en 'Advanced Settings' dentro de Streamlit.")
     st.stop()
 
 try:
@@ -21,7 +21,7 @@ except Exception as e:
     st.error(f"Error al inicializar el cliente de Google: {e}")
     st.stop()
 
-# Instrucciones del sistema para el comportamiento de Justa
+# Instrucciones del sistema
 system_instruction = """Rol y Propósito: El rol asignado es el de Justa (tu nombre), eres una agente de tutoría académica virtual para la unidad curricular Derecho del Trabajo. Tu propósito central es asistir a las y los estudiantes en la comprensión, análisis y clarificación de cualquier concepto, término o tema que forme parte del programa. 
 
 Identificación: Preliminarmente y al inicio de la interacción te identificarás como Justa, tutora académica virtual de la asignatura Derecho del Trabajo, gestionada por Luis Ignacio Chirinos Campos. Le darás la bienvenida al usuario y harás saber que cuenta con tu orientación y acompañamiento en todo lo relacionado al contenido académico de la asignatura, le invitarás a utilizarse con responsabilidad e integridad. 
@@ -32,31 +32,30 @@ Estrategia Pedagógica (Andamiaje Cognitivo): Al interactuar con el grupo de est
 
 Tono y Restricciones: Mantén en todo momento un tono profesional, accesible, motivador y un lenguaje de género neutro. Si se te consulta sobre un tema ajeno a la materia o que no guarde relación directa con los fundamentos de la unidad curricular, reconduce la conversación amablemente hacia los contenidos de la asignatura. Bajo ninguna circunstancia muestres enlaces de descarga, nombres de archivos de la base de datos o rutas internas del servidor."""
 
-# Configuración del modelo y herramientas para producción
+# Configuración de generación compatible con gemini-2.5-flash
 generate_content_config = types.GenerateContentConfig(
     temperature=0.4,
     tools=[types.Tool(googleSearch=types.GoogleSearch())],
     system_instruction=[types.Part.from_text(text=system_instruction)],
 )
 
-# Inicializar el historial de chat
+# Inicializar historial
 if "messages" not in st.session_state:
     st.session_state.messages = []
     bienvenida = "Hola. Soy Justa, tutora académica virtual de la asignatura Derecho del Trabajo, gestionada por Luis Ignacio Chirinos Campos. Te doy la bienvenida a este espacio de aprendizaje. Cuento con la preparación para brindarte orientación y acompañamiento en todo lo relacionado con el contenido académico de nuestra unidad curricular, basándome estrictamente en los documentos y materiales de estudio autorizados. Te invito a utilizar esta herramienta con responsabilidad e integridad en tu proceso de formación. Aquí puedes estudiar, repasar y aclarar cualquier duda o inquietud que tengas sobre los temas de la materia."
     st.session_state.messages.append({"role": "assistant", "content": bienvenida})
 
-# Mostrar historial en pantalla
+# Mostrar historial
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.write(message["content"])
 
-# Entrada de texto del usuario
+# Entrada de texto
 if user_input := st.chat_input("Escribe tu consulta jurídica aquí..."):
     with st.chat_message("user"):
         st.write(user_input)
     st.session_state.messages.append({"role": "user", "content": user_input})
 
-    # Respuesta en streaming desde los servidores de Google
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
         full_response = ""
@@ -72,6 +71,7 @@ if user_input := st.chat_input("Escribe tu consulta jurídica aquí..."):
             )
 
         try:
+            # Modelo de producción estable para la nueva API
             response_stream = client.models.generate_content_stream(
                 model="gemini-2.5-flash",
                 contents=api_contents,
