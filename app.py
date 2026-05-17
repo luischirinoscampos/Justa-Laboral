@@ -1,11 +1,12 @@
 import streamlit as st
+import time  # Necesario para el control de tiempo
 from google import genai
 from google.genai import types
 
 # 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layout="centered")
 
-# 2. INYECCIÓN DE ESTILOS CSS AVANZADOS (Alineación simétrica y fondo limpio)
+# 2. INYECCIÓN DE ESTILOS CSS AVANZADOS (Alineación, fondo limpio y alertas simétricas)
 st.markdown("""
     <style>
     /* Forzar fondo blanco absoluto en toda la infraestructura */
@@ -43,14 +44,32 @@ st.markdown("""
         color: #1A202C !important;
     }
 
+    /* ESTABILIZACIÓN DE RECUADROS DE ALERTA Y ERROR */
+    [data-testid="stNotification"],
+    div[data-inner-alert-container="true"],
+    .stAlert {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        margin: 10px 0px !important;
+        padding: 4px !important;
+    }
+    
+    div[role="alert"] {
+        width: 100% !important;
+        border-radius: 8px !important;
+        box-sizing: border-box !important;
+        border: 1px solid #FCA5A5 !important;
+        background-color: #FEF2F2 !important;
+        padding: 12px 16px !important;
+    }
+
     /* ESTABILIZACIÓN Y SIMETRÍA DEL CUADRO DE CONSULTA */
-    /* Contenedor general del chat input */
     [data-testid="stChatInput"] {
         background-color: #FFFFFF !important;
         padding: 10px 0px !important;
     }
 
-    /* Marco perimetral interno: asegura simetría, alineación central y fondo claro */
+    /* Marco perimetral interno de la caja de texto */
     [data-testid="stChatInput"] > div {
         background-color: #F8FAFC !important;
         background: #F8FAFC !important;
@@ -62,7 +81,7 @@ st.markdown("""
         justify-content: space-between !important;
     }
 
-    /* Ajuste estricto del área de texto para eliminar márgenes desproporcionados */
+    /* Ajuste estricto del área de escritura */
     [data-testid="stChatInput"] textarea {
         background-color: transparent !important;
         background: transparent !important;
@@ -73,12 +92,6 @@ st.markdown("""
         margin: 0 !important;
         padding: 8px 4px !important;
         resize: none !important;
-    }
-
-    /* Forzar consistencia visual durante el enfoque o escritura */
-    [data-testid="stChatInput"] textarea:focus {
-        background-color: transparent !important;
-        color: #0A2540 !important;
     }
 
     /* Alineación y estilo simétrico del botón de envío (Flecha) */
@@ -111,6 +124,10 @@ if "gemini_api_key" in st.secrets:
 else:
     api_key = None
 
+# Inicializar el registro de tiempo de la última consulta para el control de flujo
+if "last_request_time" not in st.session_state:
+    st.session_state.last_request_time = 0.0
+
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {
@@ -138,48 +155,61 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# 6. ENTRADA DE USUARIO Y PROCESAMIENTO
+# 6. ENTRADA DE USUARIO Y VALIDACIÓN DE TIEMPO (CONTROL DE FLUJO)
 if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
-    with st.chat_message("user"):
-        st.markdown(prompt)
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    current_time = time.time()
+    time_passed = current_time - st.session_state.last_request_time
+    
+    # Definir el intervalo mínimo en segundos entre consultas consecutivas
+    COOLDOWN_PERIOD = 5.0 
+    
+    if time_passed < COOLDOWN_PERIOD:
+        time_to_wait = int(COOLDOWN_PERIOD - time_passed) + 1
+        st.warning(f"Por favor, procesa tus consultas con calma. Espera {time_to_wait} segundos antes de enviar otra pregunta.")
+    else:
+        # Actualizar el marcador de tiempo con la solicitud autorizada
+        st.session_state.last_request_time = current_time
+        
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        st.session_state.messages.append({"role": "user", "content": prompt})
 
-    with st.chat_message("assistant"):
-        if not api_key:
-            error_msg = "Error: No se encontró la configuración de la API Key ('gemini_api_key') en los Secrets de Streamlit."
-            st.error(error_msg)
-            st.session_state.messages.append({"role": "assistant", "content": error_msg})
-        else:
-            try:
-                client = genai.Client(api_key=api_key)
-                
-                history_contents = []
-                for msg in st.session_state.messages[:-1]:
-                    role_mapped = "model" if msg["role"] == "assistant" else "user"
-                    history_contents.append(
-                        types.Content(role=role_mapped, parts=[types.Part.from_text(text=msg["content"])])
+        with st.chat_message("assistant"):
+            if not api_key:
+                error_msg = "Error: No se encontró la configuración de la API Key ('gemini_api_key') en los Secrets de Streamlit."
+                st.error(error_msg)
+                st.session_state.messages.append({"role": "assistant", "content": error_msg})
+            else:
+                try:
+                    client = genai.Client(api_key=api_key)
+                    
+                    history_contents = []
+                    for msg in st.session_state.messages[:-1]:
+                        role_mapped = "model" if msg["role"] == "assistant" else "user"
+                        history_contents.append(
+                            types.Content(role=role_mapped, parts=[types.Part.from_text(text=msg["content"])])
+                        )
+                    
+                    config = types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        temperature=0.3,
                     )
-                
-                config = types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    temperature=0.3,
-                )
-                
-                response = client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=prompt,
-                    config=config
-                )
-                
-                st.markdown(response.text)
-                st.session_state.messages.append({"role": "assistant", "content": response.text})
-                
-            except Exception as e:
-                error_str = str(e)
-                if "RESOURCE_EXHAUSTED" in error_str:
-                    clean_error = "Se ha agotado la cuota temporal de consultas de la API. El servicio se restablecerá automáticamente en unos momentos."
-                    st.error(clean_error)
-                else:
-                    clean_error = f"Ocurrió un inconveniente al procesar la solicitud: {error_str}"
-                    st.error(clean_error)
-                st.session_state.messages.append({"role": "assistant", "content": clean_error})
+                    
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=prompt,
+                        config=config
+                    )
+                    
+                    st.markdown(response.text)
+                    st.session_state.messages.append({"role": "assistant", "content": response.text})
+                    
+                except Exception as e:
+                    error_str = str(e)
+                    if "RESOURCE_EXHAUSTED" in error_str:
+                        clean_error = "Se ha agotado la cuota temporal de consultas de la API. El servicio se restablecerá automáticamente en unos momentos."
+                        st.error(clean_error)
+                    else:
+                        clean_error = f"Ocurrió un inconveniente al procesar la solicitud: {error_str}"
+                        st.error(clean_error)
+                    st.session_state.messages.append({"role": "assistant", "content": clean_error})
