@@ -4,6 +4,7 @@ from google.genai import types
 from datetime import datetime
 import pandas as pd
 import os
+import time
 
 # 1. CONFIGURACIÓN DE LA PÁGINA (Debe ser lo primero)
 st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layout="centered")
@@ -85,6 +86,10 @@ if "messages" not in st.session_state:
         }
     ]
 
+# Inicialización del control de tiempo para mitigar saturación de cuota
+if "ultimo_envio" not in st.session_state:
+    st.session_state.ultimo_envio = 0.0
+
 # 3. CAPTURA DEL INPUT EN LA RAÍZ (Esto obliga a Streamlit a fijarlo abajo del todo)
 prompt = st.chat_input("Escribe tu consulta jurídica aquí...")
 
@@ -106,7 +111,7 @@ with tab_chat:
         "Luis Ignacio Chirinos Campos, quien es tu creador y el docente ordinario de esta asignatura.\n"
         "- Si alguien te pregunta por tu origen, creador, desarrollador o profesor de la materia, "
         "debes reconocer con orgullo, respeto y claridad institucional que eres una creación tecnológica "
-        "del profesor Luis Ignacio Chirinos Campos para el beneficio académico del estudiantado, y perteneces al ecosistma digital de aprendizaje de la unidad curricular.\n\n"
+        "del profesor Luis Ignacio Chirinos Campos para el beneficio académico del estudiantado, y perteneces al ecosistema digital de aprendizaje de la unidad curricular.\n\n"
         "PAUTAS DE COMPORTAMIENTO Y PEDAGOGÍA:\n"
         "- Tu propósito es guiar a quienes estudian de forma pedagógica, rigurosa aunque amable, clara, cálida y cercana.\n"
         "- Utiliza siempre un lenguaje neutral, inclusivo y formal, adecuado para el ámbito universitario.\n"
@@ -122,49 +127,60 @@ with tab_chat:
 
     # Si hay una nueva entrada desde el fondo de la pantalla, se procesa aquí adentro
     if prompt:
-        registrar_consulta_local(prompt)
+        tiempo_actual = time.time()
+        tiempo_transcurrido = tiempo_actual - st.session_state.ultimo_envio
         
-        # Mostrar el mensaje del estudiante
-        with st.chat_message("user", avatar="👤"):
-            st.markdown(prompt)
-        st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
+        # Restricción obligatoria: 15 segundos entre interacciones por usuario
+        if tiempo_transcurrido < 15.0:
+            tiempo_espera = int(15.0 - tiempo_transcurrido)
+            st.warning(f"⏳ Para garantizar el acceso de todos sus compañeros(as), por favor espere {tiempo_espera} segundos antes de enviar otra consulta.")
+        else:
+            # Actualizar la marca de tiempo del último envío válido
+            st.session_state.ultimo_envio = tiempo_actual
+            
+            registrar_consulta_local(prompt)
+            
+            # Mostrar el mensaje del estudiante
+            with st.chat_message("user", avatar="👤"):
+                st.markdown(prompt)
+            st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
 
-        # Generar respuesta de Justa
-        with st.chat_message("assistant", avatar="⚖️"):
-            if not api_key:
-                st.error("Error: No se encontró la configuración de la API Key ('gemini_api_key').")
-            else:
-                try:
-                    client = genai.Client(api_key=api_key)
-                    
-                    history_contents = []
-                    for msg in st.session_state.messages[:-1]:
-                        role_mapped = "model" if msg["role"] == "assistant" else "user"
-                        history_contents.append(
-                            types.Content(role=role_mapped, parts=[types.Part.from_text(text=msg["content"])])
+            # Generar respuesta de Justa
+            with st.chat_message("assistant", avatar="⚖️"):
+                if not api_key:
+                    st.error("Error: No se encontró la configuración de la API Key ('gemini_api_key').")
+                else:
+                    try:
+                        client = genai.Client(api_key=api_key)
+                        
+                        history_contents = []
+                        for msg in st.session_state.messages[:-1]:
+                            role_mapped = "model" if msg["role"] == "assistant" else "user"
+                            history_contents.append(
+                                types.Content(role=role_mapped, parts=[types.Part.from_text(text=msg["content"])])
+                            )
+                        
+                        config = types.GenerateContentConfig(
+                            system_instruction=system_instruction, 
+                            temperature=0.3
                         )
-                    
-                    config = types.GenerateContentConfig(
-                        system_instruction=system_instruction, 
-                        temperature=0.3
-                    )
-                    
-                    response = client.models.generate_content(
-                        model='gemini-2.5-flash', 
-                        contents=prompt, 
-                        config=config
-                    )
-                    
-                    st.markdown(response.text)
-                    st.session_state.messages.append({"role": "assistant", "avatar": "⚖️", "content": response.text})
-                    
-                    # Forzar recarga limpia para pintar el nuevo mensaje en el orden correcto
-                    st.rerun()
-                    
-                except Exception as e:
-                    error_str = str(e)
-                    clean_error = "Se ha agotado la cuota temporal de consultas de la API. El servicio se restablecerá pronto." if "RESOURCE_EXHAUSTED" in error_str else f"Ocurrió un inconveniente: {error_str}"
-                    st.error(clean_error)
+                        
+                        response = client.models.generate_content(
+                            model='gemini-2.5-flash', 
+                            contents=prompt, 
+                            config=config
+                        )
+                        
+                        st.markdown(response.text)
+                        st.session_state.messages.append({"role": "assistant", "avatar": "⚖️", "content": response.text})
+                        
+                        # Forzar recarga limpia para pintar el nuevo mensaje en el orden correcto
+                        st.rerun()
+                        
+                    except Exception as e:
+                        error_str = str(e)
+                        clean_error = "Se ha agotado la cuota temporal de consultas de la API. El servicio se restablecerá pronto." if "RESOURCE_EXHAUSTED" in error_str else f"Ocurrió un inconveniente: {error_str}"
+                        st.error(clean_error)
 
 # ==========================================
 # PESTAÑA 2: CONTROL DOCENTE
