@@ -77,10 +77,10 @@ if "messages" not in st.session_state:
                 "en la doctrina jurídica, la normativa laboral vigente y los materiales académicos autorizados.\n\n"
                 "**¿Cómo te puedo apoyar en tu formación?**\n"
                 "* Solventar dudas sobre los temas de las unidades de estudio.\n"
-                "* Estudiar y repasar conceptosy contenidos temáticos esenciales.\n"
+                "* Estudiar y repasar conceptos y contenidos temáticos esenciales.\n"
                 "* Guiar tu aprendizaje de manera pedagógica y clara.\n\n"
                 "Te invito a utilizar mi apoyo con responsabilidad e integridad académica. "
-                "¿Qué tema o consulta jurídica desea abordar hoy?"
+                "¿Qué tema o consulta académica deseas abordar hoy?"
             )
         }
     ]
