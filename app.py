@@ -9,7 +9,7 @@ import pandas as pd
 # 1. CONFIGURACIÓN DE LA PÁGINA INDEPENDIENTE
 st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layout="centered")
 
-# 2. ESTILOS CSS AVANZADOS (Fondo limpio y alertas simétricas)
+# 2. ESTILOS CSS AVANZADOS (Fondo limpio, sin marcos de alerta innecesarios)
 st.markdown("""
     <style>
     .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"], 
@@ -34,13 +34,6 @@ st.markdown("""
     p, span, li, label, .stMarkdown, h1, h2, h3 {
         color: #1A202C !important;
     }
-    div[role="alert"] {
-        width: 100% !important;
-        border-radius: 8px !important;
-        border: 1px solid #FCA5A5 !important;
-        background-color: #FEF2F2 !important;
-        padding: 12px 16px !important;
-    }
     [data-testid="stChatInput"] {
         background-color: #FFFFFF !important;
         padding: 10px 0px !important;
@@ -60,7 +53,7 @@ st.markdown("""
 st.markdown('<h1 class="main-title">⚖️ Justa: Tutora Académica Virtual</h1>', unsafe_allow_html=True)
 st.markdown('<p class="sub-caption">Asignatura: Derecho del Trabajo | Profesor Luis Ignacio Chirinos Campos</p>', unsafe_allow_html=True)
 
-# 3. CONEXIÓN A BASE DE DATOS (GOOGLE SHEETS) Y API KEY
+# 3. CONEXIÓN A BASE DE DATOS Y API KEY
 api_key = st.secrets.get("gemini_api_key", None)
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
@@ -77,7 +70,7 @@ if "nombre_estudiante" not in st.session_state:
     else:
         st.session_state.nombre_estudiante = None
 
-# Mecanismo de contingencia si se ingresa fuera de Moodle
+# Mecanismo de contingencia fuera de Moodle
 if st.session_state.nombre_estudiante is None:
     st.info("Bienvenido al espacio de tutoría virtual.")
     identificacion = st.text_input("Por favor, introduce tu nombre y apellido para comenzar:")
@@ -86,7 +79,7 @@ if st.session_state.nombre_estudiante is None:
         st.rerun()
     st.stop()
 
-# 5. INICIALIZACIÓN DE VARIABLES EXCLUSIVAS DE SESIÓN
+# 5. INICIALIZACIÓN DE VARIABLES DE SESIÓN
 if "messages" not in st.session_state:
     welcome_text = (
         "Hola. Soy Justa, tutora académica virtual de la asignatura Derecho del Trabajo, "
@@ -116,7 +109,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# 7. PROCESAMIENTO Y AUDITORÍA DE CONSULTAS
+# 7. PROCESAMIENTO DE CONSULTAS
 if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
     current_time = time.time()
     time_passed = current_time - st.session_state.last_request_time
@@ -135,6 +128,7 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
             if "api_client" not in st.session_state:
                 st.error("Error de configuración: La clave de acceso de la API no está disponible en el servidor.")
             else:
+                respuesta_texto = ""
                 try:
                     native_history = []
                     filtrado = [m for m in st.session_state.messages[:-1] if "Derecho del Trabajo" not in m["content"]]
@@ -162,8 +156,17 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                     st.markdown(respuesta_texto)
                     st.session_state.messages.append({"role": "assistant", "content": respuesta_texto})
                     
-                    # REGISTRO OPTIMIZADO: Inserción directa basada en la URL del secret
-                    if conn is not None:
+                except Exception as e:
+                    if "RESOURCE_EXHAUSTED" in str(e):
+                        respuesta_texto = "La plataforma académica está procesando un alto volumen de consultas. Por favor, espera 30 segundos y presiona enviar nuevamente."
+                    else:
+                        respuesta_texto = "Lo siento, ha ocurrido un inconveniente al procesar tu consulta en el modelo de lenguaje."
+                    st.error(respuesta_texto)
+                    st.session_state.messages.append({"role": "assistant", "content": respuesta_texto})
+
+                # AUDITORÍA EN GOOGLE SHEETS EN SEGUNDO PLANO SEGURO
+                if conn is not None and respuesta_texto != "":
+                    try:
                         ahora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         nuevo_registro = pd.DataFrame([{
                             "Fecha/Hora": ahora,
@@ -171,17 +174,7 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                             "Pregunta": prompt,
                             "Respuesta_IA": respuesta_texto
                         }])
-                        
-                        # Ejecución directa pasando explícitamente el parámetro de la hoja
-                        target_sheet = st.secrets["connections"]["gsheets"]["spreadsheet"]
-                        conn.update(spreadsheet=target_sheet, data=nuevo_registro, method="append")
-                        
-                except Exception as e:
-                    error_str = str(e)
-                    if "RESOURCE_EXHAUSTED" in error_str:
-                        clean_error = "La plataforma académica está procesando un alto volumen de consultas. Por favor, espera 30 segundos y presiona enviar nuevamente."
-                        st.error(clean_error)
-                    else:
-                        clean_error = "Nota: No se pudo procesar la solicitud en este momento de forma correcta."
-                        st.error(clean_error)
-                    st.session_state.messages.append({"role": "assistant", "content": clean_error})
+                        # Escritura silenciosa: si falla la API de Google Sheets, no detiene el programa
+                        conn.update(spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"], data=nuevo_registro, method="append")
+                    except Exception:
+                        pass # Tolerancia a fallos de sincronización externa
