@@ -77,7 +77,7 @@ st.markdown("""
         border-radius: 8px !important;
         padding: 4px 8px !important;
         display: flex !important;
-        align-items: center !important;
+        align-items: center importan;
         justify-content: space-between !important;
     }
 
@@ -123,11 +123,9 @@ if "gemini_api_key" in st.secrets:
 else:
     api_key = None
 
-# Inicializar el registro de tiempo de la última consulta para el control de flujo
 if "last_request_time" not in st.session_state:
     st.session_state.last_request_time = 0.0
 
-# Texto base de bienvenida (Se mantiene estático en la interfaz)
 welcome_text = (
     "Hola. Soy Justa, tutora académica virtual de la asignatura Derecho del Trabajo, "
     "gestionada por Luis Ignacio Chirinos Campos. Te doy la bienvenida a este espacio de aprendizaje. "
@@ -139,12 +137,7 @@ welcome_text = (
 )
 
 if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {
-            "role": "assistant",
-            "content": welcome_text
-        }
-    ]
+    st.session_state.messages = [{"role": "assistant", "content": welcome_text}]
 
 system_instruction = (
     "Eres 'Justa', una tutora académica experta en Derecho del Trabajo para la Universidad Centroccidental "
@@ -157,19 +150,16 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# 6. ENTRADA DE USUARIO Y VALIDACIÓN DE TIEMPO (CONTROL DE FLUJO)
+# 6. ENTRADA DE USUARIO Y VALIDACIÓN DE TIEMPO
 if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
     current_time = time.time()
     time_passed = current_time - st.session_state.last_request_time
-    
-    # Definir el intervalo mínimo en segundos entre consultas consecutivas
-    COOLDOWN_PERIOD = 5.0 
+    COOLDOWN_PERIOD = 4.0 
     
     if time_passed < COOLDOWN_PERIOD:
         time_to_wait = int(COOLDOWN_PERIOD - time_passed) + 1
         st.warning(f"Por favor, procesa tus consultas con calma. Espera {time_to_wait} segundos antes de enviar otra pregunta.")
     else:
-        # Actualizar el marcador de tiempo con la solicitud autorizada
         st.session_state.last_request_time = current_time
         
         with st.chat_message("user"):
@@ -185,11 +175,13 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                 try:
                     client = genai.Client(api_key=api_key)
                     
-                    # Filtrar el historial: Excluir el mensaje estático de bienvenida para no saturar los tokens de la API
+                    # FILTRADO Y RECORTE DE HISTORIAL: Mantener solo los últimos 4 mensajes del chat activo
+                    # Esto impide que el volumen de tokens crezca indefinidamente y sature la API gratuita.
+                    active_history = [msg for msg in st.session_state.messages[:-1] if msg["content"] != welcome_text]
+                    truncated_history = active_history[-4:] if len(active_history) > 4 else active_history
+                    
                     history_contents = []
-                    for msg in st.session_state.messages[:-1]:
-                        if msg["content"] == welcome_text:
-                            continue
+                    for msg in truncated_history:
                         role_mapped = "model" if msg["role"] == "assistant" else "user"
                         history_contents.append(
                             types.Content(role=role_mapped, parts=[types.Part.from_text(text=msg["content"])])
