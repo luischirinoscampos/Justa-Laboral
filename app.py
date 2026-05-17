@@ -76,7 +76,6 @@ if "messages" not in st.session_state:
 if "last_request_time" not in st.session_state:
     st.session_state.last_request_time = 0.0
 
-# Inicializar cliente de API de forma aislada
 if "api_client" not in st.session_state and api_key:
     st.session_state.api_client = genai.Client(api_key=api_key)
 
@@ -95,7 +94,7 @@ for message in st.session_state.messages:
 if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
     current_time = time.time()
     time_passed = current_time - st.session_state.last_request_time
-    COOLDOWN_PERIOD = 4.0 
+    COOLDOWN_PERIOD = 3.0 
     
     if time_passed < COOLDOWN_PERIOD:
         st.warning(f"Por favor, procesa tus consultas con calma. Espera unos segundos antes de enviar otra pregunta.")
@@ -112,12 +111,12 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                 st.error(error_msg)
             else:
                 try:
-                    # Construir historial ultraligero (solo las últimas 2 interacciones del alumno)
+                    # Filtramos de forma estricta para enviar únicamente el contexto esencial
                     native_history = []
-                    # Filtrar omitiendo el mensaje de bienvenida institucional
                     filtrado = [m for m in st.session_state.messages[:-1] if "Derecho del Trabajo" not in m["content"]]
                     
-                    for msg in filtrado[-4:]:
+                    # Reducción a la mínima expresión del historial (Último par de mensajes)
+                    for msg in filtrado[-2:]:
                         role_mapped = "model" if msg["role"] == "assistant" else "user"
                         native_history.append(
                             types.Content(role=role_mapped, parts=[types.Part.from_text(text=msg["content"])])
@@ -125,12 +124,12 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                     
                     config = types.GenerateContentConfig(
                         system_instruction=system_instruction,
-                        temperature=0.3,
+                        temperature=0.2,
                     )
                     
-                    # Crear canal único para esta consulta específica
+                    # Cambio a modelo de alta velocidad y bajo peso de tokens (flash-lite)
                     chat = st.session_state.api_client.chats.create(
-                        model='gemini-2.5-flash',
+                        model='gemini-2.5-flash-lite',
                         config=config,
                         history=native_history
                     )
@@ -143,8 +142,9 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                 except Exception as e:
                     error_str = str(e)
                     if "RESOURCE_EXHAUSTED" in error_str:
-                        clean_error = "La plataforma académica está procesando un alto volumen de consultas. Por favor, espera 60 segundos y presiona enviar nuevamente."
+                        clean_error = "La plataforma académica está procesando un alto volumen de consultas. Por favor, espera 30 segundos y presiona enviar nuevamente."
                         st.error(clean_error)
                     else:
-                        clean_error = f"Nota: No se pudo procesar la solicitud en este momento de forma correcta."
+                        clean_error = "Nota: No se pudo procesar la solicitud en este momento de forma correcta."
                         st.error(clean_error)
+                    st.session_state.messages.append({"role": "assistant", "content": clean_error})
