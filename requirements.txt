@@ -1,4 +1,3 @@
 google-genai
 pandas
-psycopg2-binary
-sqlalchemy
+supabase
