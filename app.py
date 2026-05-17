@@ -69,7 +69,6 @@ st.markdown('<h1 class="main-title">⚖️ Justa: Tutora Académica Virtual</h1>
 st.markdown('<p class="sub-caption">Asignatura: Derecho del Trabajo | Profesor Luis Ignacio Chirinos Campos</p>', unsafe_allow_html=True)
 
 # 4. INICIALIZACIÓN DEL CLIENTE API Y CONTEXTO
-# Se asume que 'gemini_api_key' está configurado en los Secrets de Streamlit Cloud
 if "gemini_api_key" in st.secrets:
     api_key = st.secrets["gemini_api_key"]
 else:
@@ -119,12 +118,12 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
             st.session_state.messages.append({"role": "assistant", "content": error_msg})
         else:
             try:
-                # Inicializar el cliente oficial con la estructura correcta de la API de Google
+                # Inicializar el cliente oficial con la estructura de la API de Google
                 client = genai.Client(api_key=api_key)
                 
                 # Construir el historial para mantener la continuidad de la conversación
                 history_contents = []
-                for msg in st.session_state.messages[:-1]:  # Excluir el último prompt recién agregado
+                for msg in st.session_state.messages[:-1]:
                     role_mapped = "model" if msg["role"] == "assistant" else "user"
                     history_contents.append(
                         types.Content(role=role_mapped, parts=[types.Part.from_text(text=msg["content"])])
@@ -133,10 +132,10 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                 # Configurar los parámetros de comportamiento
                 config = types.GenerateContentConfig(
                     system_instruction=system_instruction,
-                    temperature=0.3, # Mantener respuestas precisas y doctrinales
+                    temperature=0.3,
                 )
                 
-                # Llamada directa al modelo recomendado
+                # Llamada al modelo
                 response = client.models.generate_content(
                     model='gemini-2.5-flash',
                     contents=prompt,
@@ -144,4 +143,15 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                 )
                 
                 # Renderizar la respuesta obtenida
-                st
+                st.markdown(response.text)
+                st.session_state.messages.append({"role": "assistant", "content": response.text})
+                
+            except Exception as e:
+                error_str = str(e)
+                if "RESOURCE_EXHAUSTED" in error_str:
+                    clean_error = "Se ha agotado la cuota temporal de consultas de la API. El servicio se restablecerá automáticamente en unos momentos."
+                    st.error(clean_error)
+                else:
+                    clean_error = f"Ocurrió un inconveniente al procesar la solicitud: {error_str}"
+                    st.error(clean_error)
+                st.session_state.messages.append({"role": "assistant", "content": clean_error})
