@@ -2,11 +2,38 @@ import streamlit as st
 from google import genai
 from google.genai import types
 
-# Configuración de la interfaz visual de Justa
+# Configuración de página con prestancia profesional
 st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layout="centered")
 
-st.title("⚖️ Justa: Tutora Académica Virtual")
-st.caption("Asignatura: Derecho del Trabajo | Profesor Luis Ignacio Chirinos Campos")
+# Estilización mediante CSS para una apariencia minimalista estilo Gemini
+st.markdown("""
+    <style>
+    /* Ocultar elementos innecesarios de Streamlit */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Estilizar títulos y subtítulos */
+    .main-title {
+        font-family: 'Inter', sans-serif;
+        font-weight: 700;
+        color: #FFFFFF;
+        margin-bottom: 5px;
+    }
+    .sub-caption {
+        font-family: 'Inter', sans-serif;
+        color: #9AA0A6;
+        font-size: 0.95rem;
+        margin-bottom: 25px;
+        border-bottom: 1px solid #3C4043;
+        padding-bottom: 15px;
+    }
+    </style>
+""", unsafe_allow_index=True)
+
+# Encabezado elegante
+st.markdown('<h1 class="main-title">⚖️ Justa: Tutora Académica Virtual</h1>', unsafe_allow_html=True)
+st.markdown('<p class="sub-caption">Asignatura: Derecho del Trabajo | Profesor Luis Ignacio Chirinos Campos</p>', unsafe_allow_html=True)
 
 # Conexión con los secretos de Streamlit Cloud
 if "gemini_api_key" in st.secrets:
@@ -21,7 +48,7 @@ except Exception as e:
     st.error(f"Error al inicializar el cliente de Google: {e}")
     st.stop()
 
-# Instrucciones del sistema
+# Instrucciones del sistema (Comportamiento e Identidad de Justa)
 system_instruction = """Rol y Propósito: El rol asignado es el de Justa (tu nombre), eres una agente de tutoría académica virtual para la unidad curricular Derecho del Trabajo. Tu propósito central es asistir a las y los estudiantes en la comprensión, análisis y clarificación de cualquier concepto, término o tema que forme parte del programa. 
 
 Identificación: Preliminarmente y al inicio de la interacción te identificarás como Justa, tutora académica virtual de la asignatura Derecho del Trabajo, gestionada por Luis Ignacio Chirinos Campos. Le darás la bienvenida al usuario y harás saber que cuenta con tu orientación y acompañamiento en todo lo relacionado al contenido académico de la asignatura, le invitarás a utilizarse con responsabilidad e integridad. 
@@ -32,31 +59,36 @@ Estrategia Pedagógica (Andamiaje Cognitivo): Al interactuar con el grupo de est
 
 Tono y Restricciones: Mantén en todo momento un tono profesional, accesible, motivador y un lenguaje de género neutro. Si se te consulta sobre un tema ajeno a la materia o que no guarde relación directa con los fundamentos de la unidad curricular, reconduce la conversación amablemente hacia los contenidos de la asignatura. Bajo ninguna circunstancia muestres enlaces de descarga, nombres de archivos de la base de datos o rutas internas del servidor."""
 
-# Configuración de generación compatible con gemini-2.5-flash
 generate_content_config = types.GenerateContentConfig(
     temperature=0.4,
     tools=[types.Tool(googleSearch=types.GoogleSearch())],
     system_instruction=[types.Part.from_text(text=system_instruction)],
 )
 
-# Inicializar historial
+# Inicializar historial de mensajes
 if "messages" not in st.session_state:
     st.session_state.messages = []
     bienvenida = "Hola. Soy Justa, tutora académica virtual de la asignatura Derecho del Trabajo, gestionada por Luis Ignacio Chirinos Campos. Te doy la bienvenida a este espacio de aprendizaje. Cuento con la preparación para brindarte orientación y acompañamiento en todo lo relacionado con el contenido académico de nuestra unidad curricular, basándome estrictamente en los documentos y materiales de estudio autorizados. Te invito a utilizar esta herramienta con responsabilidad e integridad en tu proceso de formación. Aquí puedes estudiar, repasar y aclarar cualquier duda o inquietud que tengas sobre los temas de la materia."
     st.session_state.messages.append({"role": "assistant", "content": bienvenida})
 
-# Mostrar historial
+# Mostrar historial usando avatares sobrios y elegantes (estilo Gemini / Usuario)
 for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.write(message["content"])
+    if message["role"] == "assistant":
+        # Icono institucional neutral gris/balanza en lugar del robot anaranjado
+        with st.chat_message("assistant", avatar="⚖️"):
+            st.write(message["content"])
+    else:
+        # Icono sobrio para el estudiante
+        with st.chat_message("user", avatar="👤"):
+            st.write(message["content"])
 
-# Entrada de texto
+# Entrada de texto del estudiante
 if user_input := st.chat_input("Escribe tu consulta jurídica aquí..."):
-    with st.chat_message("user"):
+    with st.chat_message("user", avatar="👤"):
         st.write(user_input)
     st.session_state.messages.append({"role": "user", "content": user_input})
 
-    with st.chat_message("assistant"):
+    with st.chat_message("assistant", avatar="⚖️"):
         response_placeholder = st.empty()
         full_response = ""
         
@@ -71,7 +103,6 @@ if user_input := st.chat_input("Escribe tu consulta jurídica aquí..."):
             )
 
         try:
-            # Modelo de producción estable para la nueva API
             response_stream = client.models.generate_content_stream(
                 model="gemini-2.5-flash",
                 contents=api_contents,
