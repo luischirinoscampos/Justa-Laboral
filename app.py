@@ -8,17 +8,18 @@ from supabase import create_client, Client
 # 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layout="centered")
 
-# Inicialización corregida y directa desde la raíz de st.secrets
-supabase_url = st.secrets["supabase_url"]
-supabase_key = st.secrets["supabase_key"]
-api_key = st.secrets["gemini_api_key"]
+# Mapeo seguro a prueba de caídas (KeyError)
+supabase_url = st.secrets.get("supabase_url", None)
+supabase_key = st.secrets.get("supabase_key", None)
+api_key = st.secrets.get("gemini_api_key", None)
 
+# Intentar instanciar el cliente solo si las variables existen
 supabase: Client = None
 if supabase_url and supabase_key:
     try:
         supabase = create_client(supabase_url, supabase_key)
-    except Exception as e:
-        st.error(f"Error al inicializar el cliente de Supabase: {e}")
+    except Exception:
+        pass
 
 def registrar_consulta(texto_pregunta):
     """Inserta la consulta mediante la API de Supabase de forma directa y segura"""
@@ -127,24 +128,26 @@ with tab_docente:
         st.success("Acceso Docente Verificado")
         st.subheader("Bitácora de Consultas en la Nube")
         
-        try:
-            # Consulta limpia a través de la API REST oficial de Supabase
-            response = supabase.table("consultas_justa").select("cuando, pregunta").order("id", desc=True).execute()
-            data = response.data
-            
-            if data:
-                df_log = pd.DataFrame(data)
-                df_log.columns = ["Cuándo", "Qué preguntaron"]
-                st.dataframe(df_log, use_container_width=True)
+        if not supabase_url or not supabase_key:
+            st.error("Error: Las credenciales de API de Supabase ('supabase_url' o 'supabase_key') no están configuradas o legibles en los Secrets.")
+        else:
+            try:
+                response = supabase.table("consultas_justa").select("cuando, pregunta").order("id", desc=True).execute()
+                data = response.data
                 
-                csv_data = df_log.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📥 Descargar Reporte Completo (CSV)",
-                    data=csv_data,
-                    file_name=f"interacciones_justa_{datetime.now().strftime('%d_%m_%Y')}.csv",
-                    mime="text/csv"
-                )
-            else:
-                st.info("Aún no se registran interacciones en la base de datos.")
-        except Exception as e:
-            st.error(f"Error de sincronización con Supabase: {e}")
+                if data:
+                    df_log = pd.DataFrame(data)
+                    df_log.columns = ["Cuándo", "Qué preguntaron"]
+                    st.dataframe(df_log, use_container_width=True)
+                    
+                    csv_data = df_log.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="📥 Descargar Reporte Completo (CSV)",
+                        data=csv_data,
+                        file_name=f"interacciones_justa_{datetime.now().strftime('%d_%m_%Y')}.csv",
+                        mime="text/csv"
+                    )
+                else:
+                    st.info("Aún no se registran interacciones en la base de datos.")
+            except Exception as e:
+                st.error(f"Error de sincronización con Supabase: {e}")
