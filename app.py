@@ -3,8 +3,8 @@ import time
 import datetime
 from google import genai
 from google.genai import types
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from streamlit_gsheets import GSheetsConnection
+import pandas as pd
 
 # 1. CONFIGURACIÓN DE LA PÁGINA INDEPENDIENTE
 st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layout="centered")
@@ -56,23 +56,11 @@ st.markdown('<p class="sub-caption">Asignatura: Derecho del Trabajo | Profesor L
 # 3. CONEXIÓN A BASE DE DATOS Y API KEY
 api_key = st.secrets.get("gemini_api_key", None)
 
-# Función de conexión directa via Gspread (Mucho más estable para escrituras concurrentes)
-def agregar_fila_auditoria(estudiante, seccion, pregunta, respuesta):
-    try:
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        credentials_dict = dict(st.secrets["gcp_service_account"])
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
-        client = gspread.authorize(creds)
-        
-        # Abre la hoja por su nombre exacto
-        sheet = client.open("Justa_Interacciones_Derecho_del_Trabajo").sheet1
-        
-        ahora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        # Forzar la inserción limpia de la fila al final de la hoja
-        sheet.append_row([ahora, estudiante, seccion, pregunta, respuesta])
-    except Exception as e:
-        # Si algo falla con las credenciales, lo verás inmediatamente en la barra lateral
-        st.sidebar.error(f"Error de auditoría: {e}")
+conn = None
+try:
+    conn = st.connection("gsheets", type=GSheetsConnection)
+except Exception as e:
+    st.sidebar.error(f"Error de conexión inicial: {e}")
 
 # 4. CAPTURA DEL ESTUDIANTE Y SECCIÓN DESDE LA LTI DE MOODLE
 query_params = st.query_params
@@ -160,11 +148,10 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
 
         with st.chat_message("assistant"):
+            respuesta_texto = ""
             if "api_client" not in st.session_state:
-                st.error("Error de configuración: La clave de acceso de la API no está disponible en el servidor.")
-                respuesta_texto = ""
+                st.error("Error de configuración: La clave de acceso de la API no está disponible.")
             else:
-                respuesta_texto = ""
                 try:
                     native_history = []
                     filtrado = [m for m in st.session_state.messages[:-1] if "Derecho del Trabajo" not in m["content"]]
@@ -194,19 +181,39 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                     
                 except Exception as e:
                     if "RESOURCE_EXHAUSTED" in str(e):
-                        respuesta_texto = "La plataforma académica está procesando un alto volumen de consultas. Por favor, espera 30 segundos y presiona enviar nuevamente."
+                        respuesta_texto = "La plataforma académica está procesando un alto volumen de consultas. Por favor, espera 30 segundos."
                     else:
-                        respuesta_texto = "Lo siento, ha ocurrido un inconveniente al procesar tu consulta en el modelo de lenguaje."
-                    st.error(respuesta_texto)
+                        respuesta_texto = "Lo siento, ha ocurrido un inconveniente al procesar tu consulta."
+                    st.error(f"{respuesta_texto} Detalles: {e}")
                     st.session_state.messages.append({"role": "assistant", "content": respuesta_texto})
 
-            # INVOCACIÓN DE LA AUDITORÍA DIRECTA SIN INTERRUPCIONES
-            if respuesta_texto != "":
-                agregar_fila_auditoria(
-                    st.session_state.nombre_estudiante,
-                    st.session_state.seccion_estudiante,
-                    prompt,
-                    respuesta_texto
-                )
+            # 8. AUDITORÍA SECTORIZADA (Se ejecuta solo si hay respuesta válida)
+            if conn is not None and respuesta_texto != "":
+                try:
+                    ahora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    # Estructurar fila basándose en tus columnas exactas de la imagen 351f06
+                    nueva_fila = pd.DataFrame([{
+                        "Fecha/Hora": ahora,
+                        "Estudiante": st.session_state.nombre_estudiante,
+                        "seccion": st.session_state.seccion_estudiante,
+                        "Pregunta": prompt,
+                        "Respuesta_IA": respuesta_texto
+                    }])
+                    
+                    # Leer datos actuales
+                    df_existente = conn.read(worksheet="Sheet1", ttl=0)
+                    df_existente = pd.DataFrame(df_existente)
+                    
+                    # Concatenar de forma segura limpia
+                    if not df_existente.empty:
+                        df_actualizado = pd.concat([df_existente, nueva_fila], ignore_index=True)
+                    else:
+                        df_actualizado = nueva_fila
+                    
+                    # Subir datos actualizados
+                    conn.update(worksheet="Sheet1", data=df_actualizado)
+                except Exception as e_sheets:
+                    st.sidebar.error(f"Error escribiendo en la hoja: {e_sheets}")
                     except Exception:
                         pass
