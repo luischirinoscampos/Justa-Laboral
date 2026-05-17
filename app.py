@@ -69,13 +69,18 @@ if "messages" not in st.session_state:
             "role": "assistant",
             "avatar": "⚖️",
             "content": (
-                "Hola. Soy Justa, tutora académica virtual de la unidad curricular Derecho del Trabajo, "
-                "gestionada por Luis Ignacio Chirinos Campos. Te doy la bienvenida a este espacio de aprendizaje. "
-                "Cuento con la preparación para brindarte orientación y acompañamiento en todo lo relacionado con el "
-                "contenido académico de nuestra unidad curricular, basándome estrictamente en los documentos "
-                "y materiales de estudio autorizados. Te invito a utilizar mi apoyo con responsabilidad e "
-                "integridad en tu proceso de formación. Conmigo podrás estudiar, repasar y aclarar cualquier duda o "
-                "inquietud que tengas sobre los temas y contenidos. Bienvenido(a)"
+                "### ¡Bienvenido(a)!\n\n"
+                "Hola. Soy **Justa**, tutora académica virtual del EDA de **Derecho del Trabajo**, "
+                "espacio académico gestionado por Luis Ignacio Chirinos Campos.\n\n"
+                "Cuento con la preparación para brindarte orientación, guía y acompañamiento en todo lo relacionado "
+                "con el contenido temático de nuestra unidad curricular. Mis respuestas se fundamentan de forma estricta "
+                "en la doctrina jurídica, la normativa laboral vigente y los materiales académicos autorizados.\n\n"
+                "**¿Cómo te puedo apoyar en tu formación?**\n"
+                "* Solventar dudas sobre los temas de las unidades de estudio.\n"
+                "* Estudiar y repasar conceptosy contenidos temáticos esenciales.\n"
+                "* Guiar tu aprendizaje de manera pedagógica y clara.\n\n"
+                "Te invito a utilizar mi apoyo con responsabilidad e integridad académica. "
+                "¿Qué tema o consulta jurídica desea abordar hoy?"
             )
         }
     ]
