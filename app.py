@@ -8,7 +8,7 @@ import os
 # 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layout="centered")
 
-# Recuperación segura de la API Key de Gemini
+# Recuperación de la API Key de Gemini desde los Secrets
 api_key = st.secrets.get("gemini_api_key", None)
 
 # RUTA DEL ARCHIVO LOCAL DE BITÁCORA
@@ -27,11 +27,11 @@ def registrar_consulta_local(texto_pregunta):
     except Exception:
         pass
 
-# 2. INYECCIÓN DE ESTILOS CSS (Fondo blanco institucional)
+# 2. INYECCIÓN DE ESTILOS CSS CORREGIDOS (Barra de chat fija abajo)
 st.markdown("""
     <style>
-    .stApp, [data-testid="stAppViewContainer"], [data-testid="stBottomBlockContainer"], 
-    [data-testid="stBottom"], .stChatMessage {
+    /* Fondo general blanco institucional */
+    .stApp, [data-testid="stAppViewContainer"], .stChatMessage {
         background-color: #FFFFFF !important;
         background: #FFFFFF !important;
     }
@@ -39,22 +39,38 @@ st.markdown("""
     div[data-testid="stToolbar"] { visibility: hidden; display: none; }
     #MainMenu, footer, [data-testid="stDecoration"] { visibility: hidden; display: none; }
     
+    /* Tipografía y títulos */
     .main-title { font-family: 'Inter', sans-serif; color: #0A2540 !important; font-weight: 700; margin-bottom: 5px; }
     .sub-caption { font-family: 'Inter', sans-serif; color: #4A5568 !important; font-size: 0.95rem; margin-bottom: 25px; border-bottom: 1px solid #E2E8F0; padding-bottom: 15px; }
     p, span, li, label, .stMarkdown, h1, h2, h3 { color: #1A202C !important; }
     
-    [data-testid="stChatInput"] { background-color: #FFFFFF !important; padding: 10px 0px !important; }
-    [data-testid="stChatInput"] > div { background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; border-radius: 8px !important; padding: 4px 8px !important; }
-    [data-testid="stChatInput"] textarea { background-color: transparent !important; color: #0A2540 !important; font-family: 'Inter', sans-serif !important; border: none !important; box-shadow: none !important; }
+    /* Configuración del contenedor inferior de la barra de chat */
+    [data-testid="stBottomBlockContainer"] {
+        background-color: #FFFFFF !important;
+        border-top: 1px solid #E2E8F0 !important;
+        padding-top: 10px !important;
+        padding-bottom: 20px !important;
+    }
     
-    /* Suavizar fondos de los avatares */
+    /* Estilo del cuadro de entrada de texto */
+    [data-testid="stChatInput"] > div {
+        background-color: #F8FAFC !important;
+        border: 1px solid #CBD5E1 !important;
+        border-radius: 8px !important;
+    }
+    [data-testid="stChatInput"] textarea {
+        color: #0A2540 !important;
+        font-family: 'Inter', sans-serif !important;
+    }
+    
+    /* Fondo transparente para los avatares */
     [data-testid="stChatMessageAvatarCell"] > div {
         background-color: transparent !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# 3. INTERFAZ EN PESTAÑAS (Uso de lenguaje inclusivo y profesional)
+# 3. INTERFAZ EN PESTAÑAS
 tab_chat, tab_docente = st.tabs(["💬 Aula Virtual", "🔐 Control Docente"])
 
 # ==========================================
@@ -84,14 +100,15 @@ with tab_chat:
     system_instruction = (
         "Eres 'Justa', una tutora académica experta en Derecho del Trabajo para la Universidad Centroccidental "
         "Lisandro Alvarado (UCLA). Tu rol es guiar a quienes estudian de forma pedagógica, rigurosa y clara, "
-        "utilizando un lenguaje neutral, inclusivo e institucional. Responde con base en la doctrina jurídica y la normativa laboral vigente."
+        "utilizando un lenguaje neutral e institucional. Responde con base en la doctrina jurídica y la normativa laboral vigente."
     )
 
-    # Renderizado con avatares limpios pasados explícitamente
+    # Renderizado del historial de mensajes
     for message in st.session_state.messages:
         with st.chat_message(message["role"], avatar=message.get("avatar")):
             st.markdown(message["content"])
 
+    # Entrada del chat (Streamlit la posicionará abajo de forma nativa)
     if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
         registrar_consulta_local(prompt)
         
@@ -104,10 +121,8 @@ with tab_chat:
                 st.error("Error: No se encontró la configuración de la API Key ('gemini_api_key').")
             else:
                 try:
-                    # Uso correcto del cliente moderno google-genai
                     client = genai.Client(api_key=api_key)
                     
-                    # Estructuración limpia del historial para evitar bloqueos
                     history_contents = []
                     for msg in st.session_state.messages[:-1]:
                         role_mapped = "model" if msg["role"] == "assistant" else "user"
@@ -120,7 +135,6 @@ with tab_chat:
                         temperature=0.3
                     )
                     
-                    # Llamada directa al modelo
                     response = client.models.generate_content(
                         model='gemini-2.5-flash', 
                         contents=prompt, 
