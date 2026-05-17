@@ -67,9 +67,9 @@ with tab_chat:
                     "gestionada por Luis Ignacio Chirinos Campos. Te doy la bienvenida a este espacio de aprendizaje. "
                     "Cuento con la preparación para brindarte orientación y acompañamiento en todo lo relacionado con el "
                     "contenido académico de nuestra unidad curricular, basándome estrictamente en los documentos "
-                    "y materiales de estudio autorizados. Te invito a utilizar esta herramienta con responsabilidad e "
-                    "integridad en tu proceso de formación. Aquí puedes estudiar, repasar y aclarar cualquier duda o "
-                    "inquietud que tengas sobre los temas de la materia."
+                    "y materiales de estudio autorizados. Te invito a utilizar mi apoyo con responsabilidad e "
+                    "integridad en tu proceso de formación. Conmigo podrás estudiar, repasar y aclarar cualquier duda o "
+                    "inquietud que tengas sobre los temas de la unidad curricular. Bienvenido(a)."
                 )
             }
         ]
