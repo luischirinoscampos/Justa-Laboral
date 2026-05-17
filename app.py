@@ -10,45 +10,53 @@ st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layo
 def registrar_consulta(texto_pregunta):
     """Inserta la consulta directamente en la base de datos SQL de Supabase"""
     try:
-        # Conexión nativa usando la URL de los Secrets de Streamlit
         conn = st.connection("postgresql", type="sql")
         ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
         
         with conn.session as session:
-            # Query estricta de inserción en la tabla
             session.execute(
                 "INSERT INTO consultas_justa (cuando, pregunta) VALUES (:cuando, :pregunta);",
                 {"cuando": ahora, "pregunta": texto_pregunta}
             )
             session.commit()
     except Exception as e:
-        # Aislamiento total: si la base de datos tarda o falla por internet,
-        # la experiencia de la persona usuaria no se interrumpe en absoluto.
+        # Aislamiento total ante retrasos o caídas de conexión
         pass
 
-# 2. INYECCIÓN DE ESTILOS CSS AVANZADOS (Fondo limpio, alineación simétrica y botón lateral visible)
+# 2. INYECCIÓN DE ESTILOS CSS CORREGIDOS (Garantiza visibilidad del botón lateral)
 st.markdown("""
     <style>
+    /* Fondo blanco general para los contenedores principales de la aplicación */
     .stApp, [data-testid="stAppViewContainer"], [data-testid="stSidebar"], 
-    [data-testid="stBottomBlockContainer"], [data-testid="stBottom"], 
-    div[class^="st-emotion-cache"], .stChatMessage {
+    [data-testid="stBottomBlockContainer"], [data-testid="stBottom"], .stChatMessage {
         background-color: #FFFFFF !important;
         background: #FFFFFF !important;
     }
     
-    /* Mantiene la cabecera transparente para conservar el botón de la barra lateral (>) */
+    /* Asegura la visibilidad del encabezado y del botón nativo de despliegue (>) */
     [data-testid="stHeader"] { 
         background-color: transparent !important; 
         background: transparent !important;
+        z-index: 999999 !important;
     }
     
-    /* Oculta los elementos innecesarios de la interfaz de Streamlit */
+    /* Fuerza al botón de la barra lateral a mantenerse visible y contrastado en color oscuro */
+    [data-testid="stHeader"] button {
+        color: #0A2540 !important;
+        background-color: #F8FAFC !important;
+        border: 1px solid #CBD5E1 !important;
+        border-radius: 4px !important;
+    }
+    
+    /* Oculta de forma estricta los elementos innecesarios de Streamlit */
     div[data-testid="stToolbar"] { visibility: hidden; display: none; }
     #MainMenu, footer, [data-testid="stDecoration"] { visibility: hidden; display: none; }
     
+    /* Estilos de tipografía y caja de chat */
     .main-title { font-family: 'Inter', sans-serif; color: #0A2540 !important; font-weight: 700; margin-bottom: 5px; }
     .sub-caption { font-family: 'Inter', sans-serif; color: #4A5568 !important; font-size: 0.95rem; margin-bottom: 25px; border-bottom: 1px solid #E2E8F0; padding-bottom: 15px; }
     p, span, li, label, .stMarkdown, h1, h2, h3 { color: #1A202C !important; }
+    
     [data-testid="stChatInput"] { background-color: #FFFFFF !important; padding: 10px 0px !important; }
     [data-testid="stChatInput"] > div { background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; border-radius: 8px !important; padding: 4px 8px !important; display: flex !important; align-items: center !important; }
     [data-testid="stChatInput"] textarea { background-color: transparent !important; color: #0A2540 !important; font-family: 'Inter', sans-serif !important; border: none !important; box-shadow: none !important; margin: 0 !important; padding: 8px 4px !important; resize: none !important; }
@@ -92,7 +100,6 @@ for message in st.session_state.messages:
 
 # 6. ENTRADA DE USUARIO Y PROCESAMIENTO
 if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
-    # Registro silencioso en la base de datos SQL en tiempo real
     registrar_consulta(prompt)
     
     with st.chat_message("user"):
@@ -101,7 +108,7 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
 
     with st.chat_message("assistant"):
         if not api_key:
-            error_msg = "Error: No se encontró la configuración de la API Key ('gemini_api_key') in los Secrets."
+            error_msg = "Error: No se encontró la configuración de la API Key ('gemini_api_key') en los Secrets."
             st.error(error_msg)
             st.session_state.messages.append({"role": "assistant", "content": error_msg})
         else:
@@ -137,7 +144,6 @@ if clave == "UCLA2026":
     st.sidebar.subheader("Bitácora de Consultas del EDA")
     
     try:
-        # Conexión y lectura directa de la tabla SQL de Supabase
         conn = st.connection("postgresql", type="sql")
         df_log = conn.query("SELECT cuando as \"Cuándo\", pregunta as \"Qué preguntaron\" FROM consultas_justa ORDER BY id DESC;", ttl=0)
         
