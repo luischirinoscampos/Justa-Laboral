@@ -8,7 +8,7 @@ st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layo
 # Estilización mediante CSS para una apariencia minimalista estilo Gemini
 st.markdown("""
     <style>
-    /* Ocultar elementos innecesarios de Streamlit */
+    /* Ocultar elementos de desarrollo innecesarios de Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -17,7 +17,6 @@ st.markdown("""
     .main-title {
         font-family: 'Inter', sans-serif;
         font-weight: 700;
-        color: #FFFFFF;
         margin-bottom: 5px;
     }
     .sub-caption {
@@ -29,7 +28,7 @@ st.markdown("""
         padding-bottom: 15px;
     }
     </style>
-""", unsafe_allow_index=True)
+""", unsafe_allow_html=True)
 
 # Encabezado elegante
 st.markdown('<h1 class="main-title">⚖️ Justa: Tutora Académica Virtual</h1>', unsafe_allow_html=True)
@@ -55,7 +54,7 @@ Identificación: Preliminarmente y al inicio de la interacción te identificará
 
 Manejo de la Base de Datos (Fuentes de Origen): Para cualquier explicación, definición o análisis conceptual, deberás fundamentar tus respuestas de manera estricta y prioritaria en los documentos de estudio incorporados en tu base de datos. Si un concepto o tema es consultado, debes desglosarlo con total claridad científica y jurídica utilizando los enfoques teóricos de dichos materiales, garantizando que el origen de la información sea veraz y alineado con la planificación docente.
 
-Estrategia Pedagógica (Andamiaje Cognitivo): Al interactuar con el grupo de estudiantes, tu labor no consiste en resolver asignaciones ni entregar textos listos para copiar y pegar. Cuando se te pida explicar un tema, expón el marco conceptual con precisión analítica y, acto seguido, plantea preguntas orientadoras o escenarios de reflexión que inviten a quien consulta a aplicar dicho concepto. Utiliza el andamiaje cognitivo para que la persona sea partícipe activa de su propio proceso de aprendizaje. Te asegurarás que el usuario conozca que contigo puede estudiar, repasar y aclarar dudas e inquietudes asociadas al contenido temático de la unidad curricular. 
+Estrategia Pedagógica (Andamiaje Cognitivo): Al interactuar con el grupo de estudiantes, tu labor no consiste en resolver asignaciones ni entregar textos listos para copiar y pegar. Cuando se te pida explicar un tema, expón el marco conceptual con precisión analítica y, acto chewed, plantea preguntas orientadoras o escenarios de reflexión que inviten a quien consulta a aplicar dicho concepto. Utiliza el andamiaje cognitivo para que la persona sea partícipe activa de su propio proceso de aprendizaje. Te asegurarás que el usuario conozca que contigo puede estudiar, repasar y aclarar dudas e inquietudes asociadas al contenido temático de la unidad curricular. 
 
 Tono y Restricciones: Mantén en todo momento un tono profesional, accesible, motivador y un lenguaje de género neutro. Si se te consulta sobre un tema ajeno a la materia o que no guarde relación directa con los fundamentos de la unidad curricular, reconduce la conversación amablemente hacia los contenidos de la asignatura. Bajo ninguna circunstancia muestres enlaces de descarga, nombres de archivos de la base de datos o rutas internas del servidor."""
 
@@ -65,20 +64,18 @@ generate_content_config = types.GenerateContentConfig(
     system_instruction=[types.Part.from_text(text=system_instruction)],
 )
 
-# Inicializar historial de mensajes
+# Inicializar historial de mensajes si está vacío
 if "messages" not in st.session_state:
     st.session_state.messages = []
     bienvenida = "Hola. Soy Justa, tutora académica virtual de la asignatura Derecho del Trabajo, gestionada por Luis Ignacio Chirinos Campos. Te doy la bienvenida a este espacio de aprendizaje. Cuento con la preparación para brindarte orientación y acompañamiento en todo lo relacionado con el contenido académico de nuestra unidad curricular, basándome estrictamente en los documentos y materiales de estudio autorizados. Te invito a utilizar esta herramienta con responsabilidad e integridad en tu proceso de formación. Aquí puedes estudiar, repasar y aclarar cualquier duda o inquietud que tengas sobre los temas de la materia."
     st.session_state.messages.append({"role": "assistant", "content": bienvenida})
 
-# Mostrar historial usando avatares sobrios y elegantes (estilo Gemini / Usuario)
+# Mostrar historial usando avatares sobrios (Balanza para Justa, Perfil para el alumno)
 for message in st.session_state.messages:
     if message["role"] == "assistant":
-        # Icono institucional neutral gris/balanza en lugar del robot anaranjado
         with st.chat_message("assistant", avatar="⚖️"):
             st.write(message["content"])
     else:
-        # Icono sobrio para el estudiante
         with st.chat_message("user", avatar="👤"):
             st.write(message["content"])
 
