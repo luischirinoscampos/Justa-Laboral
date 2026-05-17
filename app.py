@@ -127,19 +127,22 @@ else:
 if "last_request_time" not in st.session_state:
     st.session_state.last_request_time = 0.0
 
+# Texto base de bienvenida (Se mantiene estático en la interfaz)
+welcome_text = (
+    "Hola. Soy Justa, tutora académica virtual de la asignatura Derecho del Trabajo, "
+    "gestionada por Luis Ignacio Chirinos Campos. Te doy la bienvenida a este espacio de aprendizaje. "
+    "Cuento con la preparación para brindarte orientación y acompañamiento en todo lo relacionado con el "
+    "contenido académico de nuestra unidad curricular, basándome estrictamente en los documentos "
+    "y materiales de estudio autorizados. Te invito a utilizar esta herramienta con responsabilidad e "
+    "integridad en tu proceso de formación. Aquí puedes estudiar, repasar y aclarar cualquier duda o "
+    "inquietud que tengas sobre los temas de la materia."
+)
+
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {
             "role": "assistant",
-            "content": (
-                "Hola. Soy Justa, tutora académica virtual de la asignatura Derecho del Trabajo, "
-                "gestionada por Luis Ignacio Chirinos Campos. Te doy la bienvenida a este espacio de aprendizaje. "
-                "Cuento con la preparación para brindarte orientación y acompañamiento en todo lo relacionado con el "
-                "contenido académico de nuestra unidad curricular, basándome estrictamente en los documentos "
-                "y materiales de estudio autorizados. Te invito a utilizar esta herramienta con responsabilidad e "
-                "integridad en tu proceso de formación. Aquí puedes estudiar, repasar y aclarar cualquier duda o "
-                "inquietud que tengas sobre los temas de la materia."
-            )
+            "content": welcome_text
         }
     ]
 
@@ -182,8 +185,11 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                 try:
                     client = genai.Client(api_key=api_key)
                     
+                    # Filtrar el historial: Excluir el mensaje estático de bienvenida para no saturar los tokens de la API
                     history_contents = []
                     for msg in st.session_state.messages[:-1]:
+                        if msg["content"] == welcome_text:
+                            continue
                         role_mapped = "model" if msg["role"] == "assistant" else "user"
                         history_contents.append(
                             types.Content(role=role_mapped, parts=[types.Part.from_text(text=msg["content"])])
@@ -206,7 +212,7 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                 except Exception as e:
                     error_str = str(e)
                     if "RESOURCE_EXHAUSTED" in error_str:
-                        clean_error = "Se ha agotado la cuota temporal de consultas de la API. El servicio se restablecerá automáticamente en unos momentos."
+                        clean_error = "Se ha alcanzado el límite de transmisión temporal de la cuota gratuita. Por favor, aguarda 60 segundos y vuelve a enviar tu consulta."
                         st.error(clean_error)
                     else:
                         clean_error = f"Ocurrió un inconveniente al procesar la solicitud: {error_str}"
