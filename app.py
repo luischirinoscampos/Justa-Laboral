@@ -5,15 +5,15 @@ from google.genai import types
 # 1. CONFIGURACIÓN DE LA PÁGINA (Debe ser la primera instrucción)
 st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layout="centered")
 
-# 2. CONFIGURACIÓN ESTRICTA DE VARIABLES NATIVAS Y ESTILOS CSS
+# 2. CONFIGURACIÓN ESTRICTA DE VARIABLES NATIVAS Y ESTILOS CSS AVANZADOS
 st.markdown("""
     <style>
     /* Forzar variables globales claras en el núcleo de Streamlit */
     :root {
-        --primary-color: #0A2540;
-        --background-color: #FFFFFF;
-        --secondary-background-color: #F8FAFC;
-        --text-color: #1A202C;
+        --primary-color: #0A2540 !important;
+        --background-color: #FFFFFF !important;
+        --secondary-background-color: #F8FAFC !important;
+        --text-color: #1A202C !important;
     }
     
     /* 1. Fondo blanco absoluto e inalterable en toda la infraestructura */
@@ -22,7 +22,8 @@ st.markdown("""
     [data-testid="stHeader"], 
     [data-testid="stSidebar"],
     [data-testid="stBottomBlockContainer"],
-    div[class^="st-emotion-cache"] {
+    div[class^="st-emotion-cache"],
+    .stChatMessage {
         background-color: #FFFFFF !important;
     }
     
@@ -49,21 +50,26 @@ st.markdown("""
     }
 
     /* 3. Corrección absoluta de la barra y el cuadro de diálogo inferior */
-    /* Blanquear el contenedor externo de la caja */
-    [data-testid="stBottom"],
-    [data-testid="stChatInput"] {
+    /* Eliminar cualquier fondo oscuro del contenedor general inferior */
+    [data-testid="stBottom"] {
         background-color: #FFFFFF !important;
         border-top: 1px solid #E2E8F0 !important;
     }
 
-    /* Rediseñar el marco interno de escritura (Remueve el fondo oscuro de forma estricta) */
-    [data-testid="stChatInput"] > div {
+    /* Blanquear la caja externa del chat y remover herencias oscuras */
+    [data-testid="stChatInput"] {
+        background-color: #FFFFFF !important;
+    }
+
+    /* Rediseñar de forma estricta todo el marco interno del cuadro de texto */
+    [data-testid="stChatInput"] > div,
+    [data-testid="stChatInput"] div[class^="st-emotion-cache"] {
         background-color: #F8FAFC !important;
         border: 1px solid #CBD5E1 !important;
         border-radius: 8px !important;
     }
 
-    /* Forzar color de texto azul oscuro dentro de la caja de diálogo */
+    /* Forzar color de texto azul oscuro y fondo limpio dentro del área de escritura */
     [data-testid="stChatInput"] textarea {
         background-color: transparent !important;
         color: #0A2540 !important;
@@ -129,7 +135,7 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
 
     with st.chat_message("assistant"):
         if not api_key:
-            error_msg = "Error: No se encontró la configuración de la API Key ('gemini_api_key') en los Secrets de Streamlit."
+            error_msg = "Error: No se encontró la configuración de la API Key ('gemini_api_key') in los Secrets de Streamlit."
             st.error(error_msg)
             st.session_state.messages.append({"role": "assistant", "content": error_msg})
         else:
