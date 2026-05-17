@@ -3,26 +3,32 @@ from google import genai
 from google.genai import types
 from datetime import datetime
 import pandas as pd
+from supabase import create_client, Client
 
 # 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layout="centered")
 
-def registrar_consulta(texto_pregunta):
-    """Inserta la consulta directamente en la base de datos SQL de Supabase"""
+# Inicialización del cliente oficial de Supabase mediante API HTTP
+supabase_url = st.secrets.get("supabase_url", None)
+supabase_key = st.secrets.get("supabase_key", None)
+
+supabase: Client = None
+if supabase_url and supabase_key:
     try:
-        conn = st.connection("postgresql", type="sql")
-        ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-        
-        with conn.session as session:
-            session.execute(
-                "INSERT INTO consultas_justa (cuando, pregunta) VALUES (:cuando, :pregunta);",
-                {"cuando": ahora, "pregunta": texto_pregunta}
-            )
-            session.commit()
-    except Exception as e:
+        supabase = create_client(supabase_url, supabase_key)
+    except Exception:
         pass
 
-# 2. INYECCIÓN DE ESTILOS CSS LIMPIOS (Sin bloquear componentes nativos)
+def registrar_consulta(texto_pregunta):
+    """Inserta la consulta mediante la API de Supabase de forma directa y segura"""
+    if supabase:
+        try:
+            ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+            supabase.table("consultas_justa").insert({"cuando": ahora, "pregunta": texto_pregunta}).execute()
+        except Exception:
+            pass
+
+# 2. INYECCIÓN DE ESTILOS CSS LIMPIOS
 st.markdown("""
     <style>
     .stApp, [data-testid="stAppViewContainer"], [data-testid="stBottomBlockContainer"], 
@@ -30,26 +36,19 @@ st.markdown("""
         background-color: #FFFFFF !important;
         background: #FFFFFF !important;
     }
-    
-    /* Muestra la barra superior de forma limpia y transparente */
-    [data-testid="stHeader"] { 
-        background-color: transparent !important;
-    }
-    
+    [data-testid="stHeader"] { background-color: transparent !important; }
     div[data-testid="stToolbar"] { visibility: hidden; display: none; }
     #MainMenu, footer, [data-testid="stDecoration"] { visibility: hidden; display: none; }
-    
     .main-title { font-family: 'Inter', sans-serif; color: #0A2540 !important; font-weight: 700; margin-bottom: 5px; }
     .sub-caption { font-family: 'Inter', sans-serif; color: #4A5568 !important; font-size: 0.95rem; margin-bottom: 25px; border-bottom: 1px solid #E2E8F0; padding-bottom: 15px; }
     p, span, li, label, .stMarkdown, h1, h2, h3 { color: #1A202C !important; }
-    
     [data-testid="stChatInput"] { background-color: #FFFFFF !important; padding: 10px 0px !important; }
     [data-testid="stChatInput"] > div { background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; border-radius: 8px !important; padding: 4px 8px !important; }
     [data-testid="stChatInput"] textarea { background-color: transparent !important; color: #0A2540 !important; font-family: 'Inter', sans-serif !important; border: none !important; box-shadow: none !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# 3. INTERFAZ EN PESTAÑAS (Resuelve el problema de acceso en móviles y pantallas cortas)
+# 3. INTERFAZ EN PESTAÑAS
 tab_chat, tab_docente = st.tabs(["💬 Aula Virtual", "🔐 Control Docente"])
 
 # ==========================================
@@ -96,8 +95,7 @@ with tab_chat:
 
         with st.chat_message("assistant"):
             if not api_key:
-                error_msg = "Error: No se encontró la configuración de la API Key ('gemini_api_key')."
-                st.error(error_msg)
+                st.error("Error: No se encontró la configuración de la API Key ('gemini_api_key').")
             else:
                 try:
                     client = genai.Client(api_key=api_key)
@@ -130,21 +128,27 @@ with tab_docente:
         st.success("Acceso Docente Verificado")
         st.subheader("Bitácora de Consultas en la Nube")
         
-        try:
-            conn = st.connection("postgresql", type="sql")
-            df_log = conn.query("SELECT cuando as \"Cuándo\", pregunta as \"Qué preguntaron\" FROM consultas_justa ORDER BY id DESC;", ttl=0)
-            
-            if not df_log.empty:
-                st.dataframe(df_log, use_container_width=True)
+        if not supabase:
+            st.error("Error: Las credenciales de API de Supabase ('supabase_url' o 'supabase_key') no están configuradas en los Secrets.")
+        else:
+            try:
+                # Consulta limpia a través de la API REST oficial de Supabase
+                response = supabase.table("consultas_justa").select("cuando, pregunta").order("id", desc=True).execute()
+                data = response.data
                 
-                csv_data = df_log.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📥 Descargar Reporte Completo (CSV)",
-                    data=csv_data,
-                    file_name=f"interacciones_justa_{datetime.now().strftime('%d_%m_%Y')}.csv",
-                    mime="text/csv"
-                )
-            else:
-                st.info("Aún no se registran interacciones en la base de datos.")
-        except Exception as e:
-            st.error(f"Error de sincronización con Supabase: {e}")
+                if data:
+                    df_log = pd.DataFrame(data)
+                    df_log.columns = ["Cuándo", "Qué preguntaron"]
+                    st.dataframe(df_log, use_container_width=True)
+                    
+                    csv_data = df_log.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="📥 Descargar Reporte Completo (CSV)",
+                        data=csv_data,
+                        file_name=f"interacciones_justa_{datetime.now().strftime('%d_%m_%Y')}.csv",
+                        mime="text/csv"
+                    )
+                else:
+                    st.info("Aún no se registran interacciones en la base de datos.")
+            except Exception as e:
+                st.error(f"Error de sincronización con Supabase: {e}")
