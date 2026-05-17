@@ -60,7 +60,7 @@ conn = None
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
 except Exception as e:
-    st.sidebar.error(f"Error de conexión inicial: {e}")
+    st.sidebar.error(f"Error de conexión inicial GSheets: {e}")
 
 # 4. CAPTURA DEL ESTUDIANTE Y SECCIÓN DESDE LA LTI DE MOODLE
 query_params = st.query_params
@@ -187,12 +187,14 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                     st.error(f"{respuesta_texto} Detalles: {e}")
                     st.session_state.messages.append({"role": "assistant", "content": respuesta_texto})
 
-            # 8. AUDITORÍA SECTORIZADA (Se ejecuta solo si hay respuesta válida)
+            # 8. AUDITORÍA CRÍTICA DE INTERACCIONES (Estructura lineal corregida)
             if conn is not None and respuesta_texto != "":
                 try:
                     ahora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     
-                    # Estructurar fila basándose en tus columnas exactas de la imagen 351f06
+                    # Definición estricta de las columnas exactas de tu Google Sheets
+                    columnas_hoja = ["Fecha/Hora", "Estudiante", "seccion", "Pregunta", "Respuesta_IA"]
+                    
                     nueva_fila = pd.DataFrame([{
                         "Fecha/Hora": ahora,
                         "Estudiante": st.session_state.nombre_estudiante,
@@ -201,19 +203,21 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                         "Respuesta_IA": respuesta_texto
                     }])
                     
-                    # Leer datos actuales
-                    df_existente = conn.read(worksheet="Sheet1", ttl=0)
-                    df_existente = pd.DataFrame(df_existente)
+                    try:
+                        df_existente = conn.read(worksheet="Sheet1", ttl=0)
+                        df_existente = pd.DataFrame(df_existente)
+                    except Exception:
+                        df_existente = pd.DataFrame(columns=columnas_hoja)
                     
-                    # Concatenar de forma segura limpia
-                    if not df_existente.empty:
-                        df_actualizado = pd.concat([df_existente, nueva_fila], ignore_index=True)
-                    else:
+                    # Validar si el DataFrame existente está realmente vacío o no tiene columnas correctas
+                    if df_existente.empty or len(df_existente.columns) == 0:
                         df_actualizado = nueva_fila
+                    else:
+                        df_actualizado = pd.concat([df_existente, nueva_fila], ignore_index=True)
                     
-                    # Subir datos actualizados
+                    # Forzar la reescritura de los datos
                     conn.update(worksheet="Sheet1", data=df_actualizado)
                 except Exception as e_sheets:
-                    st.sidebar.error(f"Error escribiendo en la hoja: {e_sheets}")
+                    st.sidebar.error(f"Error de escritura en Google Sheets: {e_sheets}")
                     except Exception:
                         pass
