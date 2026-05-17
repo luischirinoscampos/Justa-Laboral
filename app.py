@@ -26,15 +26,26 @@ def registrar_consulta(texto_pregunta):
         # la experiencia de la persona usuaria no se interrumpe en absoluto.
         pass
 
-# 2. INYECCIÓN DE ESTILOS CSS AVANZADOS (Fondo limpio y alineación simétrica)
+# 2. INYECCIÓN DE ESTILOS CSS AVANZADOS (Fondo limpio, alineación simétrica y botón lateral visible)
 st.markdown("""
     <style>
-    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"], 
-    [data-testid="stSidebar"], [data-testid="stBottomBlockContainer"], 
-    [data-testid="stBottom"], div[class^="st-emotion-cache"], .stChatMessage {
+    .stApp, [data-testid="stAppViewContainer"], [data-testid="stSidebar"], 
+    [data-testid="stBottomBlockContainer"], [data-testid="stBottom"], 
+    div[class^="st-emotion-cache"], .stChatMessage {
         background-color: #FFFFFF !important;
         background: #FFFFFF !important;
     }
+    
+    /* Mantiene la cabecera transparente para conservar el botón de la barra lateral (>) */
+    [data-testid="stHeader"] { 
+        background-color: transparent !important; 
+        background: transparent !important;
+    }
+    
+    /* Oculta los elementos innecesarios de la interfaz de Streamlit */
+    div[data-testid="stToolbar"] { visibility: hidden; display: none; }
+    #MainMenu, footer, [data-testid="stDecoration"] { visibility: hidden; display: none; }
+    
     .main-title { font-family: 'Inter', sans-serif; color: #0A2540 !important; font-weight: 700; margin-bottom: 5px; }
     .sub-caption { font-family: 'Inter', sans-serif; color: #4A5568 !important; font-size: 0.95rem; margin-bottom: 25px; border-bottom: 1px solid #E2E8F0; padding-bottom: 15px; }
     p, span, li, label, .stMarkdown, h1, h2, h3 { color: #1A202C !important; }
@@ -42,7 +53,6 @@ st.markdown("""
     [data-testid="stChatInput"] > div { background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; border-radius: 8px !important; padding: 4px 8px !important; display: flex !important; align-items: center !important; }
     [data-testid="stChatInput"] textarea { background-color: transparent !important; color: #0A2540 !important; font-family: 'Inter', sans-serif !important; border: none !important; box-shadow: none !important; margin: 0 !important; padding: 8px 4px !important; resize: none !important; }
     [data-testid="stChatInput"] button { color: #0A2540 !important; background-color: transparent !important; border: none !important; display: flex !important; align-items: center !important; }
-    #MainMenu, footer, header, [data-testid="stDecoration"] { visibility: hidden; display: none; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -91,7 +101,7 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
 
     with st.chat_message("assistant"):
         if not api_key:
-            error_msg = "Error: No se encontró la configuración de la API Key ('gemini_api_key') en los Secrets."
+            error_msg = "Error: No se encontró la configuración de la API Key ('gemini_api_key') in los Secrets."
             st.error(error_msg)
             st.session_state.messages.append({"role": "assistant", "content": error_msg})
         else:
