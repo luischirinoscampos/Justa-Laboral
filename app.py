@@ -1,7 +1,10 @@
 import streamlit as st
 import time
+import datetime
 from google import genai
 from google.genai import types
+from streamlit_gsheets import GSheetsConnection
+import pandas as pd
 
 # 1. CONFIGURACIÓN DE LA PÁGINA INDEPENDIENTE
 st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layout="centered")
@@ -57,10 +60,33 @@ st.markdown("""
 st.markdown('<h1 class="main-title">⚖️ Justa: Tutora Académica Virtual</h1>', unsafe_allow_html=True)
 st.markdown('<p class="sub-caption">Asignatura: Derecho del Trabajo | Profesor Luis Ignacio Chirinos Campos</p>', unsafe_allow_html=True)
 
-# 3. EXTRAER API KEY DE LOS SECRETS
+# 3. CONEXIÓN A BASE DE DATOS (GOOGLE SHEETS) Y API KEY
 api_key = st.secrets.get("gemini_api_key", None)
+try:
+    conn = st.connection("gsheets", type=GSheetsConnection)
+except Exception:
+    conn = None
 
-# 4. INICIALIZACIÓN DE VARIABLES EXCLUSIVAS POR SESIÓN DE USUARIO
+# 4. CAPTURA DEL ESTUDIANTE ENVIADO DESDE LA LTI DE MOODLE
+query_params = st.query_params
+moodle_user = query_params.get("estudiante", None)
+
+if "nombre_estudiante" not in st.session_state:
+    if moodle_user:
+        st.session_state.nombre_estudiante = moodle_user
+    else:
+        st.session_state.nombre_estudiante = None
+
+# Mecanismo de contingencia si se ingresa fuera de Moodle
+if st.session_state.nombre_estudiante is None:
+    st.info("Bienvenido al espacio de tutoría virtual.")
+    identificacion = st.text_input("Por favor, introduce tu nombre y apellido para comenzar:")
+    if identificacion:
+        st.session_state.nombre_estudiante = identificacion.strip().replace(" ", "_")
+        st.rerun()
+    st.stop()
+
+# 5. INICIALIZACIÓN DE VARIABLES EXCLUSIVAS DE SESIÓN
 if "messages" not in st.session_state:
     welcome_text = (
         "Hola. Soy Justa, tutora académica virtual de la asignatura Derecho del Trabajo, "
@@ -85,19 +111,19 @@ system_instruction = (
     "utilizando un lenguaje neutral e institucional. Responde con base en la doctrina jurídica y la normativa laboral vigente."
 )
 
-# 5. MOSTRAR HISTORIAL LOCAL DEL ESTUDIANTE
+# 6. MOSTRAR HISTORIAL LOCAL DEL ESTUDIANTE
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# 6. PROCESAMIENTO DE CONSULTAS CON PROTECCIÓN ANTISATURACIÓN
+# 7. PROCESAMIENTO Y AUDITORÍA DE CONSULTAS
 if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
     current_time = time.time()
     time_passed = current_time - st.session_state.last_request_time
     COOLDOWN_PERIOD = 3.0 
     
     if time_passed < COOLDOWN_PERIOD:
-        st.warning(f"Por favor, procesa tus consultas con calma. Espera unos segundos antes de enviar otra pregunta.")
+        st.warning("Por favor, procesa tus consultas con calma. Espera unos segundos antes de enviar otra pregunta.")
     else:
         st.session_state.last_request_time = current_time
         
@@ -107,15 +133,12 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
 
         with st.chat_message("assistant"):
             if "api_client" not in st.session_state:
-                error_msg = "Error de configuración: La clave de acceso de la API no está disponible en el servidor."
-                st.error(error_msg)
+                st.error("Error de configuración: La clave de acceso de la API no está disponible en el servidor.")
             else:
                 try:
-                    # Filtramos de forma estricta para enviar únicamente el contexto esencial
                     native_history = []
                     filtrado = [m for m in st.session_state.messages[:-1] if "Derecho del Trabajo" not in m["content"]]
                     
-                    # Reducción a la mínima expresión del historial (Último par de mensajes)
                     for msg in filtrado[-2:]:
                         role_mapped = "model" if msg["role"] == "assistant" else "user"
                         native_history.append(
@@ -127,7 +150,6 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                         temperature=0.2,
                     )
                     
-                    # Cambio a modelo de alta velocidad y bajo peso de tokens (flash-lite)
                     chat = st.session_state.api_client.chats.create(
                         model='gemini-2.5-flash-lite',
                         config=config,
@@ -135,10 +157,25 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                     )
                     
                     response = chat.send_message(prompt)
+                    respuesta_texto = response.text
                     
-                    st.markdown(response.text)
-                    st.session_state.messages.append({"role": "assistant", "content": response.text})
+                    st.markdown(respuesta_texto)
+                    st.session_state.messages.append({"role": "assistant", "content": respuesta_texto})
                     
+                    # REGISTRO DE MÉTRICA EN GOOGLE SHEETS
+                    if conn:
+                        ahora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        nuevo_registro = pd.DataFrame([{
+                            "Fecha/Hora": ahora,
+                            "Estudiante": st.session_state.nombre_estudiante,
+                            "Pregunta": prompt,
+                            "Respuesta_IA": respuesta_texto
+                        }])
+                        
+                        datos_actuales = conn.read()
+                        datos_actualizados = pd.concat([datos_actuales, nuevo_registro], ignore_index=True)
+                        conn.update(data=datos_actualizados)
+                        
                 except Exception as e:
                     error_str = str(e)
                     if "RESOURCE_EXHAUSTED" in error_str:
