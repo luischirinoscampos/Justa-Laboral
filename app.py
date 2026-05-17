@@ -6,10 +6,10 @@ from google.genai import types
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 
-# 1. CONFIGURACIÓN DE LA PÁGINA INDEPENDIENTE
+# 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layout="centered")
 
-# 2. ESTILOS CSS AVANZADOS
+# 2. ESTILOS CSS
 st.markdown("""
     <style>
     .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"], 
@@ -59,8 +59,8 @@ api_key = st.secrets.get("gemini_api_key", None)
 conn = None
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
-except Exception as e:
-    st.sidebar.error(f"Error de conexión inicial GSheets: {e}")
+except Exception as e_conn:
+    st.sidebar.error(f"Error de conexión inicial GSheets: {e_conn}")
 
 # 4. CAPTURA DEL ESTUDIANTE Y SECCIÓN DESDE LA LTI DE MOODLE
 query_params = st.query_params
@@ -147,8 +147,10 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
             st.markdown(prompt)
         st.session_state.messages.append({"role": "user", "content": prompt})
 
+        respuesta_texto = ""
+        ejecucion_correcta = False
+
         with st.chat_message("assistant"):
-            respuesta_texto = ""
             if "api_client" not in st.session_state:
                 st.error("Error de configuración: La clave de acceso de la API no está disponible.")
             else:
@@ -178,46 +180,39 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                     
                     st.markdown(respuesta_texto)
                     st.session_state.messages.append({"role": "assistant", "content": respuesta_texto})
+                    ejecucion_correcta = True
                     
-                except Exception as e:
-                    if "RESOURCE_EXHAUSTED" in str(e):
+                except Exception as e_gemini:
+                    if "RESOURCE_EXHAUSTED" in str(e_gemini):
                         respuesta_texto = "La plataforma académica está procesando un alto volumen de consultas. Por favor, espera 30 segundos."
                     else:
                         respuesta_texto = "Lo siento, ha ocurrido un inconveniente al procesar tu consulta."
-                    st.error(f"{respuesta_texto} Detalles: {e}")
+                    st.error(f"{respuesta_texto} Detalles: {e_gemini}")
                     st.session_state.messages.append({"role": "assistant", "content": respuesta_texto})
 
-            # 8. AUDITORÍA CRÍTICA DE INTERACCIONES (Estructura lineal corregida)
-            if conn is not None and respuesta_texto != "":
+        # 8. AUDITORÍA INDEPENDIENTE (Fuera del bloque try-except de Gemini)
+        if ejecucion_correcta and conn is not None and respuesta_texto != "":
+            try:
+                ahora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                columnas_hoja = ["Fecha/Hora", "Estudiante", "seccion", "Pregunta", "Respuesta_IA"]
+                
+                nueva_fila = pd.DataFrame([{
+                    "Fecha/Hora": ahora,
+                    "Estudiante": st.session_state.nombre_estudiante,
+                    "seccion": st.session_state.seccion_estudiante,
+                    "Pregunta": prompt,
+                    "Respuesta_IA": respuesta_texto
+                }])
+                
                 try:
-                    ahora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    
-                    # Definición estricta de las columnas exactas de tu Google Sheets
-                    columnas_hoja = ["Fecha/Hora", "Estudiante", "seccion", "Pregunta", "Respuesta_IA"]
-                    
-                    nueva_fila = pd.DataFrame([{
-                        "Fecha/Hora": ahora,
-                        "Estudiante": st.session_state.nombre_estudiante,
-                        "seccion": st.session_state.seccion_estudiante,
-                        "Pregunta": prompt,
-                        "Respuesta_IA": respuesta_texto
-                    }])
-                    
-                    try:
-                        df_existente = conn.read(worksheet="Sheet1", ttl=0)
-                        df_existente = pd.DataFrame(df_existente)
-                    except Exception:
-                        df_existente = pd.DataFrame(columns=columnas_hoja)
-                    
-                    # Validar si el DataFrame existente está realmente vacío o no tiene columnas correctas
-                    if df_existente.empty or len(df_existente.columns) == 0:
-                        df_actualizado = nueva_fila
-                    else:
-                        df_actualizado = pd.concat([df_existente, nueva_fila], ignore_index=True)
-                    
-                    # Forzar la reescritura de los datos
-                    conn.update(worksheet="Sheet1", data=df_actualizado)
-                except Exception as e_sheets:
-                    st.sidebar.error(f"Error de escritura en Google Sheets: {e_sheets}")
-                    except Exception:
-                        pass
+                    df_existente = conn.read(worksheet="Sheet1", ttl=0)
+                    df_existente = pd.DataFrame(df_existente)
+                except Exception:
+                    df_existente = pd.DataFrame(columns=columnas_hoja)
+                
+                if df_existente.empty or len(df_existente.columns) == 0:
+                    df_actualizado = nueva_fila
+                else:
+                    df_actualizado = pd.concat([df_existente, nueva_fila], ignore_index=True)
+                
+                conn.update(worksheet="Sheet1", data
