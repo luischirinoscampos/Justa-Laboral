@@ -77,7 +77,7 @@ st.markdown("""
         border-radius: 8px !important;
         padding: 4px 8px !important;
         display: flex !important;
-        align-items: center importan;
+        align-items: center !important;
         justify-content: space-between !important;
     }
 
@@ -154,7 +154,7 @@ for message in st.session_state.messages:
 if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
     current_time = time.time()
     time_passed = current_time - st.session_state.last_request_time
-    COOLDOWN_PERIOD = 4.0 
+    COOLDOWN_PERIOD = 5.0 
     
     if time_passed < COOLDOWN_PERIOD:
         time_to_wait = int(COOLDOWN_PERIOD - time_passed) + 1
@@ -168,35 +168,41 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
 
         with st.chat_message("assistant"):
             if not api_key:
-                error_msg = "Error: No se encontró la configuración de la API Key ('gemini_api_key') en los Secrets de Streamlit."
+                error_msg = "Error: No se encontró la configuración de la API Key ('gemini_api_key') in los Secrets de Streamlit."
                 st.error(error_msg)
                 st.session_state.messages.append({"role": "assistant", "content": error_msg})
             else:
                 try:
+                    # Inicializar el cliente nativo correctamente
                     client = genai.Client(api_key=api_key)
                     
-                    # FILTRADO Y RECORTE DE HISTORIAL: Mantener solo los últimos 4 mensajes del chat activo
-                    # Esto impide que el volumen de tokens crezca indefinidamente y sature la API gratuita.
-                    active_history = [msg for msg in st.session_state.messages[:-1] if msg["content"] != welcome_text]
-                    truncated_history = active_history[-4:] if len(active_history) > 4 else active_history
+                    # Formatear el historial de forma nativa para el motor de chats de Google
+                    native_history = []
+                    # Omitir el primer mensaje de bienvenida para no gastar tokens
+                    active_msgs = [m for m in st.session_state.messages[:-1] if m["content"] != welcome_text]
                     
-                    history_contents = []
-                    for msg in truncated_history:
+                    # Conservar únicamente las últimas 2 interacciones (4 mensajes) para un consumo mínimo
+                    for msg in active_msgs[-4:]:
                         role_mapped = "model" if msg["role"] == "assistant" else "user"
-                        history_contents.append(
+                        native_history.append(
                             types.Content(role=role_mapped, parts=[types.Part.from_text(text=msg["content"])])
                         )
                     
+                    # Configuración del modelo
                     config = types.GenerateContentConfig(
                         system_instruction=system_instruction,
                         temperature=0.3,
                     )
                     
-                    response = client.models.generate_content(
+                    # Crear el canal de chat nativo con el historial limpio
+                    chat = client.chats.create(
                         model='gemini-2.5-flash',
-                        contents=prompt,
-                        config=config
+                        config=config,
+                        history=native_history
                     )
+                    
+                    # Enviar el mensaje actual
+                    response = chat.send_message(prompt)
                     
                     st.markdown(response.text)
                     st.session_state.messages.append({"role": "assistant", "content": response.text})
@@ -204,9 +210,9 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                 except Exception as e:
                     error_str = str(e)
                     if "RESOURCE_EXHAUSTED" in error_str:
-                        clean_error = "Se ha alcanzado el límite de transmisión temporal de la cuota gratuita. Por favor, aguarda 60 segundos y vuelve a enviar tu consulta."
+                        clean_error = "Se ha alcanzado el límite temporal de la cuota gratuita. Por favor, aguarda 60 segundos y vuelve a enviar tu consulta."
                         st.error(clean_error)
                     else:
                         clean_error = f"Ocurrió un inconveniente al procesar la solicitud: {error_str}"
                         st.error(clean_error)
-                    st.session_state.messages.append({"role": "assistant", "content": clean_error})
+                    st.session_state.messages.append({"role": "assistant", "content": clean_error}
