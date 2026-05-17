@@ -162,7 +162,7 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                     st.markdown(respuesta_texto)
                     st.session_state.messages.append({"role": "assistant", "content": respuesta_texto})
                     
-                    # REGISTRO DE MÉTRICA EN GOOGLE SHEETS
+                    # REGISTRO DE MÉTRICA EN GOOGLE SHEETS (Sintaxis simplificada de inserción)
                     if conn is not None:
                         ahora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         nuevo_registro = pd.DataFrame([{
@@ -173,13 +173,14 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                         }])
                         
                         try:
+                            # Intenta leer los datos existentes, si falla o está vacía inicializa el DataFrame
                             datos_actuales = conn.read()
                             datos_actualizados = pd.concat([datos_actuales, nuevo_registro], ignore_index=True)
                         except Exception:
                             datos_actualizados = nuevo_registro
                         
-                        # Uso de la sintaxis nativa robusta para actualizar la hoja
-                        conn.update(spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"], data=datos_actualizados)
+                        # Actualización explícita utilizando el método nativo de la conexión de Streamlit
+                        conn.update(data=datos_actualizados)
                         
                 except Exception as e:
                     error_str = str(e)
