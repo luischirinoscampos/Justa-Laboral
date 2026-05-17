@@ -69,7 +69,17 @@ if "nombre_estudiante" not in st.session_state:
     st.session_state.nombre_estudiante = moodle_user if moodle_user else None
 
 if "seccion_estudiante" not in st.session_state:
-    st.session_state.seccion_estudiante = moodle_section if moodle_section else None
+    if moodle_section:
+        # Homologar la entrada de Moodle a mayúsculas por si viene como n01 o m03
+        sec_upper = str(moodle_section).strip().upper()
+        # Normalizar formatos cortos como N1 o M3 a sus nombres oficiales de tabla
+        if sec_upper == "N1":
+            sec_upper = "N01"
+        elif sec_upper == "M3":
+            sec_upper = "M03"
+        st.session_state.seccion_estudiante = sec_upper
+    else:
+        st.session_state.seccion_estudiante = None
 
 # Mecanismo de contingencia fuera de Moodle
 if st.session_state.nombre_estudiante is None or st.session_state.seccion_estudiante is None:
@@ -77,7 +87,8 @@ if st.session_state.nombre_estudiante is None or st.session_state.seccion_estudi
     
     with st.form("registro_contingencia"):
         identificacion = st.text_input("Por favor, introduce tu nombre y apellido:")
-        opciones_seccion = ["Selecciona tu sección...", "N01", "N1", "M03", "M3"]
+        # Opciones restringidas estrictamente a N01 y M03
+        opciones_seccion = ["Selecciona tu sección...", "N01", "M03"]
         sec_seleccionada = st.selectbox("Selecciona tu sección académica:", opciones_seccion)
         boton_entrar = st.form_submit_button("Comenzar Tutoría")
         
@@ -101,7 +112,7 @@ if "messages" not in st.session_state:
         "contenido académico de nuestra unidad curricular, basándome estrictamente en los documentos "
         "y materiales de estudio autorizados. Te invito a utilizar esta herramienta con responsabilidad e "
         "integridad en tu proceso de formación. Aquí puedes estudiar, repasar y aclarar cualquier duda o "
-        "inquietud que tengas sobre los temas de la materia."
+        "inquietun que tengas sobre los temas de la materia."
     )
     st.session_state.messages = [{"role": "assistant", "content": welcome_text}]
 
@@ -177,16 +188,16 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                     st.error(respuesta_texto)
                     st.session_state.messages.append({"role": "assistant", "content": respuesta_texto})
 
-                # AUDITORÍA EN GOOGLE SHEETS EN SEGUNDO PLANO TOTALMENTE CORREGIDA
+                # AUDITORÍA EN GOOGLE SHEETS EN SEGUNDO PLANO
                 if conn is not None and respuesta_texto != "":
                     try:
                         ahora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         
-                        # 1. Leer el estado actual de la hoja para no sobreescribir lo que ya existe
+                        # 1. Leer el estado actual de la hoja para anexar los renglones
                         data_existente = conn.read(worksheet="Sheet1", ttl=0)
                         df_existente = pd.DataFrame(data_existente)
                         
-                        # 2. Estructurar la nueva interacción respetando exactamente tus nuevas columnas
+                        # 2. Estructurar la fila con los nombres de columna idénticos a tu hoja
                         nueva_fila = pd.DataFrame([{
                             "Fecha/Hora": ahora,
                             "Estudiante": st.session_state.nombre_estudiante,
@@ -195,10 +206,10 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                             "Respuesta_IA": respuesta_texto
                         }])
                         
-                        # 3. Concatenar la fila vieja con la nueva
+                        # 3. Combinar datos previos con el nuevo registro
                         df_actualizado = pd.concat([df_existente, nueva_fila], ignore_index=True)
                         
-                        # 4. Enviar el DataFrame completo con el método correcto
+                        # 4. Actualizar la hoja de cálculo de Google
                         conn.update(worksheet="Sheet1", data=df_actualizado)
                     except Exception:
-                        pass # Tolerancia total a fallos para que la experiencia del alumno no se rompa
+                        pass
