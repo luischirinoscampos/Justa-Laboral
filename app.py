@@ -9,7 +9,7 @@ import pandas as pd
 # 1. CONFIGURACIÓN DE LA PÁGINA INDEPENDIENTE
 st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layout="centered")
 
-# 2. ESTILOS CSS AVANZADOS (Fondo limpio, sin marcos de alerta innecesarios)
+# 2. ESTILOS CSS AVANZADOS
 st.markdown("""
     <style>
     .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"], 
@@ -55,9 +55,12 @@ st.markdown('<p class="sub-caption">Asignatura: Derecho del Trabajo | Profesor L
 
 # 3. CONEXIÓN A BASE DE DATOS Y API KEY
 api_key = st.secrets.get("gemini_api_key", None)
+
+# Inicialización explícita de la conexión con Google Sheets usando los Secrets mapeados
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
-except Exception:
+except Exception as e:
+    st.error(f"Error al conectar con Google Sheets: {e}")
     conn = None
 
 # 4. CAPTURA DEL ESTUDIANTE Y SECCIÓN DESDE LA LTI DE MOODLE
@@ -70,9 +73,7 @@ if "nombre_estudiante" not in st.session_state:
 
 if "seccion_estudiante" not in st.session_state:
     if moodle_section:
-        # Homologar la entrada de Moodle a mayúsculas por si viene como n01 o m03
         sec_upper = str(moodle_section).strip().upper()
-        # Normalizar formatos cortos como N1 o M3 a sus nombres oficiales de tabla
         if sec_upper == "N1":
             sec_upper = "N01"
         elif sec_upper == "M3":
@@ -87,7 +88,6 @@ if st.session_state.nombre_estudiante is None or st.session_state.seccion_estudi
     
     with st.form("registro_contingencia"):
         identificacion = st.text_input("Por favor, introduce tu nombre y apellido:")
-        # Opciones restringidas estrictamente a N01 y M03
         opciones_seccion = ["Selecciona tu sección...", "N01", "M03"]
         sec_seleccionada = st.selectbox("Selecciona tu sección académica:", opciones_seccion)
         boton_entrar = st.form_submit_button("Comenzar Tutoría")
@@ -112,7 +112,7 @@ if "messages" not in st.session_state:
         "contenido académico de nuestra unidad curricular, basándome estrictamente en los documentos "
         "y materiales de estudio autorizados. Te invito a utilizar esta herramienta con responsabilidad e "
         "integridad en tu proceso de formación. Aquí puedes estudiar, repasar y aclarar cualquier duda o "
-        "inquietun que tengas sobre los temas de la materia."
+        "inquietud que tengas sobre los temas de la materia."
     )
     st.session_state.messages = [{"role": "assistant", "content": welcome_text}]
 
@@ -151,6 +151,7 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
         with st.chat_message("assistant"):
             if "api_client" not in st.session_state:
                 st.error("Error de configuración: La clave de acceso de la API no está disponible en el servidor.")
+                respuesta_texto = ""
             else:
                 respuesta_texto = ""
                 try:
@@ -185,31 +186,32 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                         respuesta_texto = "La plataforma académica está procesando un alto volumen de consultas. Por favor, espera 30 segundos y presiona enviar nuevamente."
                     else:
                         respuesta_texto = "Lo siento, ha ocurrido un inconveniente al procesar tu consulta en el modelo de lenguaje."
-                    st.error(respuesta_texto)
+                    st.error(f"{respuesta_texto} Detalles: {e}")
                     st.session_state.messages.append({"role": "assistant", "content": respuesta_texto})
 
-                # AUDITORÍA EN GOOGLE SHEETS EN SEGUNDO PLANO
-                if conn is not None and respuesta_texto != "":
-                    try:
-                        ahora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        
-                        # 1. Leer el estado actual de la hoja para anexar los renglones
-                        data_existente = conn.read(worksheet="Sheet1", ttl=0)
-                        df_existente = pd.DataFrame(data_existente)
-                        
-                        # 2. Estructurar la fila con los nombres de columna idénticos a tu hoja
-                        nueva_fila = pd.DataFrame([{
-                            "Fecha/Hora": ahora,
-                            "Estudiante": st.session_state.nombre_estudiante,
-                            "sección": st.session_state.seccion_estudiante,
-                            "Pregunta": prompt,
-                            "Respuesta_IA": respuesta_texto
-                        }])
-                        
-                        # 3. Combinar datos previos con el nuevo registro
-                        df_actualizado = pd.concat([df_existente, nueva_fila], ignore_index=True)
-                        
-                        # 4. Actualizar la hoja de cálculo de Google
-                        conn.update(worksheet="Sheet1", data=df_actualizado)
+            # AUDITORÍA EN GOOGLE SHEETS
+            if conn is not None and respuesta_texto != "":
+                try:
+                    ahora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    # Estructuramos la nueva fila asegurando coincidencia exacta de columnas
+                    nueva_fila = pd.DataFrame([{
+                        "Fecha/Hora": ahora,
+                        "Estudiante": st.session_state.nombre_estudiante,
+                        "seccion": st.session_state.seccion_estudiante,
+                        "Pregunta": prompt,
+                        "Respuesta_IA": respuesta_texto
+                    }])
+                    
+                    # Leemos los datos actuales (Sheet1 es el nombre por defecto de la pestaña en español)
+                    df_existente = conn.read(worksheet="Sheet1", ttl=0)
+                    df_existente = pd.DataFrame(df_existente)
+                    
+                    # Concatenamos y subimos de vuelta
+                    df_actualizado = pd.concat([df_existente, nueva_fila], ignore_index=True)
+                    conn.update(worksheet="Sheet1", data=df_actualizado)
+                except Exception as sheets_error:
+                    # Alerta visible en desarrollo si la escritura falla
+                    st.sidebar.error(f"Error de escritura en Google Sheets: {sheets_error}")
                     except Exception:
                         pass
