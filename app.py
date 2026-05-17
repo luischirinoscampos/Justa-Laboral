@@ -9,7 +9,7 @@ import pandas as pd
 # 1. CONFIGURACIÓN DE LA PÁGINA INDEPENDIENTE
 st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layout="centered")
 
-# 2. ESTILOS CSS AVANZADOS
+# 2. ESTILOS CSS AVANZADOS (Fondo limpio)
 st.markdown("""
     <style>
     .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"], 
@@ -55,12 +55,9 @@ st.markdown('<p class="sub-caption">Asignatura: Derecho del Trabajo | Profesor L
 
 # 3. CONEXIÓN A BASE DE DATOS Y API KEY
 api_key = st.secrets.get("gemini_api_key", None)
-
-# Inicialización explícita de la conexión con Google Sheets usando los Secrets mapeados
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
-except Exception as e:
-    st.error(f"Error al conectar con Google Sheets: {e}")
+except Exception:
     conn = None
 
 # 4. CAPTURA DEL ESTUDIANTE Y SECCIÓN DESDE LA LTI DE MOODLE
@@ -151,7 +148,6 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
         with st.chat_message("assistant"):
             if "api_client" not in st.session_state:
                 st.error("Error de configuración: La clave de acceso de la API no está disponible en el servidor.")
-                respuesta_texto = ""
             else:
                 respuesta_texto = ""
                 try:
@@ -186,32 +182,36 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                         respuesta_texto = "La plataforma académica está procesando un alto volumen de consultas. Por favor, espera 30 segundos y presiona enviar nuevamente."
                     else:
                         respuesta_texto = "Lo siento, ha ocurrido un inconveniente al procesar tu consulta en el modelo de lenguaje."
-                    st.error(f"{respuesta_texto} Detalles: {e}")
+                    st.error(respuesta_texto)
                     st.session_state.messages.append({"role": "assistant", "content": respuesta_texto})
 
-            # AUDITORÍA EN GOOGLE SHEETS
-            if conn is not None and respuesta_texto != "":
-                try:
-                    ahora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    
-                    # Estructuramos la nueva fila asegurando coincidencia exacta de columnas
-                    nueva_fila = pd.DataFrame([{
-                        "Fecha/Hora": ahora,
-                        "Estudiante": st.session_state.nombre_estudiante,
-                        "seccion": st.session_state.seccion_estudiante,
-                        "Pregunta": prompt,
-                        "Respuesta_IA": respuesta_texto
-                    }])
-                    
-                    # Leemos los datos actuales (Sheet1 es el nombre por defecto de la pestaña en español)
-                    df_existente = conn.read(worksheet="Sheet1", ttl=0)
-                    df_existente = pd.DataFrame(df_existente)
-                    
-                    # Concatenamos y subimos de vuelta
-                    df_actualizado = pd.concat([df_existente, nueva_fila], ignore_index=True)
-                    conn.update(worksheet="Sheet1", data=df_actualizado)
-                except Exception as sheets_error:
-                    # Alerta visible en desarrollo si la escritura falla
-                    st.sidebar.error(f"Error de escritura en Google Sheets: {sheets_error}")
+                # AUDITORÍA EN GOOGLE SHEETS
+                if conn is not None and respuesta_texto != "":
+                    try:
+                        ahora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        
+                        # 1. Leer el estado actual de la hoja
+                        data_existente = conn.read(worksheet="Sheet1", ttl=0)
+                        df_existente = pd.DataFrame(data_existente)
+                        
+                        # 2. Estructurar la fila con los nombres exactos de tu hoja (seccion sin acento)
+                        nueva_fila = pd.DataFrame([{
+                            "Fecha/Hora": ahora,
+                            "Estudiante": st.session_state.nombre_estudiante,
+                            "seccion": st.session_state.seccion_estudiante,
+                            "Pregunta": prompt,
+                            "Respuesta_IA": respuesta_texto
+                        }])
+                        
+                        # 3. Combinar datos previos con el nuevo registro
+                        if not df_existente.empty:
+                            df_actualizado = pd.concat([df_existente, nueva_fila], ignore_index=True)
+                        else:
+                            df_actualizado = nueva_fila
+                        
+                        # 4. Actualizar la hoja de cálculo de Google
+                        conn.update(worksheet="Sheet1", data=df_actualizado)
+                    except Exception:
+                        pass
                     except Exception:
                         pass
