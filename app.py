@@ -5,17 +5,17 @@ from datetime import datetime
 import pandas as pd
 import os
 
-# 1. CONFIGURACIÓN DE LA PÁGINA
+# 1. CONFIGURACIÓN DE LA PÁGINA (Debe ser lo primero)
 st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layout="centered")
 
-# Recuperación de la API Key de Gemini desde los Secrets
+# Recuperación de la API Key de Gemini
 api_key = st.secrets.get("gemini_api_key", None)
 
 # RUTA DEL ARCHIVO LOCAL DE BITÁCORA
 ARCHIVO_BITACORA = "consultas_local.csv"
 
 def registrar_consulta_local(texto_pregunta):
-    """Guarda la consulta inmediatamente en un archivo CSV local en el servidor"""
+    """Guarda la consulta de inmediato en un archivo CSV local"""
     try:
         ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
         nuevo_registro = pd.DataFrame([{"Cuándo": ahora, "Qué preguntaron": texto_pregunta}])
@@ -27,10 +27,9 @@ def registrar_consulta_local(texto_pregunta):
     except Exception:
         pass
 
-# 2. INYECCIÓN DE ESTILOS CSS CORREGIDOS (Barra de chat fija abajo)
+# 2. INYECCIÓN DE ESTILOS CSS (Fondo blanco institucional y limpieza visual)
 st.markdown("""
     <style>
-    /* Fondo general blanco institucional */
     .stApp, [data-testid="stAppViewContainer"], .stChatMessage {
         background-color: #FFFFFF !important;
         background: #FFFFFF !important;
@@ -39,20 +38,14 @@ st.markdown("""
     div[data-testid="stToolbar"] { visibility: hidden; display: none; }
     #MainMenu, footer, [data-testid="stDecoration"] { visibility: hidden; display: none; }
     
-    /* Tipografía y títulos */
     .main-title { font-family: 'Inter', sans-serif; color: #0A2540 !important; font-weight: 700; margin-bottom: 5px; }
     .sub-caption { font-family: 'Inter', sans-serif; color: #4A5568 !important; font-size: 0.95rem; margin-bottom: 25px; border-bottom: 1px solid #E2E8F0; padding-bottom: 15px; }
     p, span, li, label, .stMarkdown, h1, h2, h3 { color: #1A202C !important; }
     
-    /* Configuración del contenedor inferior de la barra de chat */
-    [data-testid="stBottomBlockContainer"] {
+    /* Input del chat flotante abajo en la raíz */
+    [data-testid="stChatInput"] {
         background-color: #FFFFFF !important;
-        border-top: 1px solid #E2E8F0 !important;
-        padding-top: 10px !important;
-        padding-bottom: 20px !important;
     }
-    
-    /* Estilo del cuadro de entrada de texto */
     [data-testid="stChatInput"] > div {
         background-color: #F8FAFC !important;
         border: 1px solid #CBD5E1 !important;
@@ -63,14 +56,34 @@ st.markdown("""
         font-family: 'Inter', sans-serif !important;
     }
     
-    /* Fondo transparente para los avatares */
     [data-testid="stChatMessageAvatarCell"] > div {
         background-color: transparent !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# 3. INTERFAZ EN PESTAÑAS
+# Inicialización obligatoria del historial antes de renderizar pestañas
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {
+            "role": "assistant",
+            "avatar": "⚖️",
+            "content": (
+                "Hola. Soy Justa, tutora académica virtual de la asignatura Derecho del Trabajo, "
+                "gestionada por Luis Ignacio Chirinos Campos. Te doy la bienvenida a este espacio de aprendizaje. "
+                "Cuento con la preparación para brindarte orientación y acompañamiento en todo lo relacionado con el "
+                "contenido académico de nuestra unidad curricular, basándome estrictamente en los documentos "
+                "y materiales de estudio autorizados. Te invito a utilizar esta herramienta con responsabilidad e "
+                "integridad en tu proceso de formación. Aquí puedes estudiar, repasar y aclarar cualquier duda o "
+                "inquietud que tengas sobre los temas de la materia."
+            )
+        }
+    ]
+
+# 3. CAPTURA DEL INPUT EN LA RAÍZ (Esto obliga a Streamlit a fijarlo abajo del todo)
+prompt = st.chat_input("Escribe tu consulta jurídica aquí...")
+
+# 4. ESTRUCTURA DE PESTAÑAS
 tab_chat, tab_docente = st.tabs(["💬 Aula Virtual", "🔐 Control Docente"])
 
 # ==========================================
@@ -80,42 +93,27 @@ with tab_chat:
     st.markdown('<h1 class="main-title">⚖️ Justa: Tutora Académica Virtual</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-caption">Asignatura: Derecho del Trabajo | Docencia: Luis Ignacio Chirinos Campos</p>', unsafe_allow_html=True)
 
-    if "messages" not in st.session_state:
-        st.session_state.messages = [
-            {
-                "role": "assistant",
-                "avatar": "⚖️",
-                "content": (
-                    "Hola. Soy Justa, tutora académica virtual de la asignatura Derecho del Trabajo, "
-                    "gestionada por Luis Ignacio Chirinos Campos. Te doy la bienvenida a este espacio de aprendizaje. "
-                    "Cuento con la preparación para brindarte orientación y acompañamiento en todo lo relacionado con el "
-                    "contenido académico de nuestra unidad curricular, basándome estrictamente en los documentos "
-                    "y materiales de estudio autorizados. Te invito a utilizar esta herramienta con responsabilidad e "
-                    "integridad en tu proceso de formación. Aquí puedes estudiar, repasar y aclarar cualquier duda o "
-                    "inquietud que tengas sobre los temas de la materia."
-                )
-            }
-        ]
-
     system_instruction = (
         "Eres 'Justa', una tutora académica experta en Derecho del Trabajo para la Universidad Centroccidental "
         "Lisandro Alvarado (UCLA). Tu rol es guiar a quienes estudian de forma pedagógica, rigurosa y clara, "
         "utilizando un lenguaje neutral e institucional. Responde con base en la doctrina jurídica y la normativa laboral vigente."
     )
 
-    # Renderizado del historial de mensajes
+    # Renderizar todos los mensajes procesados hasta ahora
     for message in st.session_state.messages:
         with st.chat_message(message["role"], avatar=message.get("avatar")):
             st.markdown(message["content"])
 
-    # Entrada del chat (Streamlit la posicionará abajo de forma nativa)
-    if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
+    # Si hay una nueva entrada desde el fondo de la pantalla, se procesa aquí adentro
+    if prompt:
         registrar_consulta_local(prompt)
         
+        # Mostrar el mensaje del estudiante
         with st.chat_message("user", avatar="👤"):
             st.markdown(prompt)
         st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
 
+        # Generar respuesta de Justa
         with st.chat_message("assistant", avatar="⚖️"):
             if not api_key:
                 st.error("Error: No se encontró la configuración de la API Key ('gemini_api_key').")
@@ -143,6 +141,9 @@ with tab_chat:
                     
                     st.markdown(response.text)
                     st.session_state.messages.append({"role": "assistant", "avatar": "⚖️", "content": response.text})
+                    
+                    # Forzar recarga limpia para pintar el nuevo mensaje en el orden correcto
+                    st.rerun()
                     
                 except Exception as e:
                     error_str = str(e)
