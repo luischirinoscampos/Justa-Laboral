@@ -1,5 +1,5 @@
 import streamlit as st
-import time  # Necesario para el control de tiempo
+import time
 from google import genai
 from google.genai import types
 
@@ -103,7 +103,6 @@ st.markdown("""
         padding: 0px 4px !important;
         display: flex !important;
         align-items: center !important;
-        justify-content: center !important;
     }
 
     /* Eliminar componentes de desarrollo en la interfaz */
