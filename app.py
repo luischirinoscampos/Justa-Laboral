@@ -5,32 +5,51 @@ from google.genai import types
 # Configuración de página con prestancia profesional
 st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layout="centered")
 
-# Estilización mediante CSS para una apariencia minimalista estilo Gemini
+# Estilización estricta: Fondo Blanco y Letras Azul Oscuro (Estándar Académico)
 st.markdown("""
     <style>
-    /* Ocultar elementos de desarrollo innecesarios de Streamlit */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
+    /* Forzar fondo blanco en toda la aplicación */
+    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+        background-color: #FFFFFF !important;
+    }
     
-    /* Estilizar títulos y subtítulos */
+    /* Títulos y textos principales en Azul Oscuro Corporativo */
     .main-title {
         font-family: 'Inter', sans-serif;
+        color: #0A2540 !important;
         font-weight: 700;
         margin-bottom: 5px;
     }
+    
     .sub-caption {
         font-family: 'Inter', sans-serif;
-        color: #9AA0A6;
+        color: #4A5568 !important;
         font-size: 0.95rem;
         margin-bottom: 25px;
-        border-bottom: 1px solid #3C4043;
+        border-bottom: 1px solid #E2E8F0;
         padding-bottom: 15px;
     }
+
+    /* Forzar que los textos generales e introductorios sean legibles en oscuro */
+    p, span, li {
+        color: #1A202C !important;
+    }
+
+    /* Estilizar la caja de entrada de texto (Chat Input) */
+    [data-testid="stChatInput"] textarea {
+        background-color: #F8FAFC !important;
+        color: #0A2540 !important;
+        border: 1px solid #CBD5E1 !important;
+    }
+
+    /* Ocultar elementos de desarrollo innecesarios */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
 
-# Encabezado elegante
+# Encabezado elegante y contrastado
 st.markdown('<h1 class="main-title">⚖️ Justa: Tutora Académica Virtual</h1>', unsafe_allow_html=True)
 st.markdown('<p class="sub-caption">Asignatura: Derecho del Trabajo | Profesor Luis Ignacio Chirinos Campos</p>', unsafe_allow_html=True)
 
