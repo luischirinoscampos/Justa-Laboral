@@ -3,34 +3,32 @@ from google import genai
 from google.genai import types
 from datetime import datetime
 import pandas as pd
-from supabase import create_client, Client
+import os
 
 # 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layout="centered")
 
-# Mapeo seguro a prueba de caídas (KeyError)
-supabase_url = st.secrets.get("supabase_url", None)
-supabase_key = st.secrets.get("supabase_key", None)
+# Recuperación segura de la API Key de Gemini
 api_key = st.secrets.get("gemini_api_key", None)
 
-# Intentar instanciar el cliente solo si las variables existen
-supabase: Client = None
-if supabase_url and supabase_key:
+# RUTA DEL ARCHIVO LOCAL DE BITÁCORA
+ARCHIVO_BITACORA = "consultas_local.csv"
+
+def registrar_consulta_local(texto_pregunta):
+    """Guarda la consulta inmediatamente en un archivo CSV local en el servidor"""
     try:
-        supabase = create_client(supabase_url, supabase_key)
+        ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+        nuevo_registro = pd.DataFrame([{"Cuándo": ahora, "Qué preguntaron": texto_pregunta}])
+        
+        # Si el archivo ya existe, añade el registro sin escribir el encabezado
+        if os.path.exists(ARCHIVO_BITACORA):
+            nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='a', header=False, index=False, encoding='utf-8')
+        else:
+            nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='w', header=True, index=False, encoding='utf-8')
     except Exception:
-        pass
+        pass  # Garantiza que el flujo del chat jamás se interrumpa si falla el disco
 
-def registrar_consulta(texto_pregunta):
-    """Inserta la consulta mediante la API de Supabase de forma directa y segura"""
-    if supabase:
-        try:
-            ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-            supabase.table("consultas_justa").insert({"cuando": ahora, "pregunta": texto_pregunta}).execute()
-        except Exception:
-            pass
-
-# 2. INYECCIÓN DE ESTILOS CSS LIMPIOS
+# 2. INYECCIÓN DE ESTILOS CSS LIMPIOS (Fondo Blanco Institucional)
 st.markdown("""
     <style>
     .stApp, [data-testid="stAppViewContainer"], [data-testid="stBottomBlockContainer"], 
@@ -50,7 +48,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 3. INTERFAZ EN PESTAÑAS
+# 3. INTERFAZ EN PESTAÑAS (Uso de lenguaje inclusivo e institucional)
 tab_chat, tab_docente = st.tabs(["💬 Aula Virtual", "🔐 Control Docente"])
 
 # ==========================================
@@ -58,7 +56,7 @@ tab_chat, tab_docente = st.tabs(["💬 Aula Virtual", "🔐 Control Docente"])
 # ==========================================
 with tab_chat:
     st.markdown('<h1 class="main-title">⚖️ Justa: Tutora Académica Virtual</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-caption">Asignatura: Derecho del Trabajo | Docente: Luis Ignacio Chirinos Campos</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-caption">Asignatura: Derecho del Trabajo | Docencia: Luis Ignacio Chirinos Campos</p>', unsafe_allow_html=True)
 
     if "messages" not in st.session_state:
         st.session_state.messages = [
@@ -79,7 +77,7 @@ with tab_chat:
     system_instruction = (
         "Eres 'Justa', una tutora académica experta en Derecho del Trabajo para la Universidad Centroccidental "
         "Lisandro Alvarado (UCLA). Tu rol es guiar a quienes estudian de forma pedagógica, rigurosa y clara, "
-        "utilizando un lenguaje neutral e institucional. Responde con base en la doctrina jurídica y la normativa laboral vigente."
+        "utilizando un lenguaje neutral, inclusivo e institucional. Responde con base en la doctrina jurídica y la normativa laboral vigente."
     )
 
     for message in st.session_state.messages:
@@ -87,7 +85,8 @@ with tab_chat:
             st.markdown(message["content"])
 
     if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
-        registrar_consulta(prompt)
+        # Registro local e inmediato de la pregunta
+        registrar_consulta_local(prompt)
         
         with st.chat_message("user"):
             st.markdown(prompt)
@@ -118,7 +117,7 @@ with tab_chat:
                     st.error(clean_error)
 
 # ==========================================
-# PESTAÑA 2: CONTROL DOCENTE DIRECTO
+# PESTAÑA 2: CONTROL DOCENTE (INTERNO)
 # ==========================================
 with tab_docente:
     st.markdown('<h2 class="main-title">🔐 Panel de Gestión Académica</h2>', unsafe_allow_html=True)
@@ -126,19 +125,16 @@ with tab_docente:
 
     if clave == "UCLA2026":
         st.success("Acceso Docente Verificado")
-        st.subheader("Bitácora de Consultas en la Nube")
+        st.subheader("Bitácora de Consultas Locales")
         
-        if not supabase_url or not supabase_key:
-            st.error("Error: Las credenciales de API de Supabase ('supabase_url' o 'supabase_key') no están configuradas o legibles en los Secrets.")
-        else:
+        # Lectura directa del archivo CSV local
+        if os.path.exists(ARCHIVO_BITACORA):
             try:
-                response = supabase.table("consultas_justa").select("cuando, pregunta").order("id", desc=True).execute()
-                data = response.data
+                df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
                 
-                if data:
-                    df_log = pd.DataFrame(data)
-                    df_log.columns = ["Cuándo", "Qué preguntaron"]
-                    st.dataframe(df_log, use_container_width=True)
+                if not df_log.empty:
+                    # Mostrar las consultas ordenadas reflejando las más recientes primero
+                    st.dataframe(df_log.iloc[::-1], use_container_width=True)
                     
                     csv_data = df_log.to_csv(index=False).encode('utf-8')
                     st.download_button(
@@ -148,6 +144,8 @@ with tab_docente:
                         mime="text/csv"
                     )
                 else:
-                    st.info("Aún no se registran interacciones en la base de datos.")
+                    st.info("El archivo de bitácora está vacío.")
             except Exception as e:
-                st.error(f"Error de sincronización con Supabase: {e}")
+                st.error(f"Error al leer la bitácora local: {e}")
+        else:
+            st.info("Aún no se registran interacciones en este servidor.")
