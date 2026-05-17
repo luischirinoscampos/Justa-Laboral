@@ -5,10 +5,10 @@ from google.genai import types
 # 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layout="centered")
 
-# 2. INYECCIÓN DE ESTILOS CSS AVANZADOS (Fondo blanco absoluto y caja integrada)
+# 2. INYECCIÓN DE ESTILOS CSS AVANZADOS (Alineación simétrica y fondo limpio)
 st.markdown("""
     <style>
-    /* Forzar fondo blanco en toda la infraestructura visible y oculta */
+    /* Forzar fondo blanco absoluto en toda la infraestructura */
     .stApp, 
     [data-testid="stAppViewContainer"], 
     [data-testid="stHeader"], 
@@ -38,37 +38,62 @@ st.markdown("""
         padding-bottom: 15px;
     }
 
-    /* Forzar color de texto para alta legibilidad */
+    /* Color de texto general para alta legibilidad */
     p, span, li, label, .stMarkdown, h1, h2, h3 {
         color: #1A202C !important;
     }
 
-    /* SOLUCIÓN AL CUADRO DE ESCRITURA: Forzar fondo claro en el input y sus pseudoelementos */
-    [data-testid="stChatInput"],
-    [data-testid="stChatInput"] > div,
-    [data-testid="stChatInput"] div[class^="st-emotion-cache"],
-    [data-testid="stChatInput"] textarea {
+    /* ESTABILIZACIÓN Y SIMETRÍA DEL CUADRO DE CONSULTA */
+    /* Contenedor general del chat input */
+    [data-testid="stChatInput"] {
+        background-color: #FFFFFF !important;
+        padding: 10px 0px !important;
+    }
+
+    /* Marco perimetral interno: asegura simetría, alineación central y fondo claro */
+    [data-testid="stChatInput"] > div {
         background-color: #F8FAFC !important;
         background: #F8FAFC !important;
-        color: #0A2540 !important;
         border: 1px solid #CBD5E1 !important;
+        border-radius: 8px !important;
+        padding: 4px 8px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
     }
 
-    /* Asegurar que el área interna de texto elimine cualquier rastro oscuro al escribir o enfocar */
-    [data-testid="stChatInput"] textarea:focus {
-        background-color: #F8FAFC !important;
+    /* Ajuste estricto del área de texto para eliminar márgenes desproporcionados */
+    [data-testid="stChatInput"] textarea {
+        background-color: transparent !important;
+        background: transparent !important;
         color: #0A2540 !important;
-        border-color: #0A2540 !important;
+        font-family: 'Inter', sans-serif !important;
+        border: none !important;
         box-shadow: none !important;
+        margin: 0 !important;
+        padding: 8px 4px !important;
+        resize: none !important;
     }
 
-    /* Ajustar el botón de envío (Flecha) */
+    /* Forzar consistencia visual durante el enfoque o escritura */
+    [data-testid="stChatInput"] textarea:focus {
+        background-color: transparent !important;
+        color: #0A2540 !important;
+    }
+
+    /* Alineación y estilo simétrico del botón de envío (Flecha) */
     [data-testid="stChatInput"] button {
         color: #0A2540 !important;
         background-color: transparent !important;
+        border: none !important;
+        margin: 0 !important;
+        padding: 0px 4px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
 
-    /* Ocultar componentes de desarrollo */
+    /* Eliminar componentes de desarrollo en la interfaz */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
