@@ -190,29 +190,8 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                     st.error(f"{respuesta_texto} Detalles: {e_gemini}")
                     st.session_state.messages.append({"role": "assistant", "content": respuesta_texto})
 
-        # 8. AUDITORÍA INDEPENDIENTE (Fuera del bloque try-except de Gemini)
+        # 8. AUDITORÍA SECTORIZADA INDEPENDIENTE
         if ejecucion_correcta and conn is not None and respuesta_texto != "":
             try:
                 ahora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                columnas_hoja = ["Fecha/Hora", "Estudiante", "seccion", "Pregunta", "Respuesta_IA"]
-                
-                nueva_fila = pd.DataFrame([{
-                    "Fecha/Hora": ahora,
-                    "Estudiante": st.session_state.nombre_estudiante,
-                    "seccion": st.session_state.seccion_estudiante,
-                    "Pregunta": prompt,
-                    "Respuesta_IA": respuesta_texto
-                }])
-                
-                try:
-                    df_existente = conn.read(worksheet="Sheet1", ttl=0)
-                    df_existente = pd.DataFrame(df_existente)
-                except Exception:
-                    df_existente = pd.DataFrame(columns=columnas_hoja)
-                
-                if df_existente.empty or len(df_existente.columns) == 0:
-                    df_actualizado = nueva_fila
-                else:
-                    df_actualizado = pd.concat([df_existente, nueva_fila], ignore_index=True)
-                
-                conn.update(worksheet="Sheet1", data
+                columnas
