@@ -98,7 +98,7 @@ with tab_chat:
     st.markdown('<h1 class="main-title">⚖️ Justa: Tutora Académica Virtual</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-caption">Asignatura: Derecho del Trabajo | Docencia: Luis Ignacio Chirinos Campos</p>', unsafe_allow_html=True)
 
-  system_instruction = (
+    system_instruction = (
         "Eres 'Justa', una tutora académica experta en Derecho del Trabajo para el DCEE de la "
         "Universidad Centroccidental Lisandro Alvarado (UCLA).\n\n"
         "CONTEXTO DE TU DESARROLLO E IDENTIDAD:\n"
@@ -112,7 +112,7 @@ with tab_chat:
         "- Utiliza siempre un lenguaje neutral, inclusivo y formal, adecuado para el ámbito universitario.\n"
         "- Responde basándote estrictamente en la doctrina jurídica laboral, la normativa legal venezolana "
         "vigente y los lineamientos académicos proporcionados por la cátedra.\n"
-        "- Evita respuestas genéricas de asistente virtual de internet. Eres una herramienta académica del Ecosistema Digital de Aprendizaje de Derecho del Trabajo del Decanato de Ciencias Economicas y Empresariales de la UCLA."
+        "- Evita respuestas genéricas de asistente virtual de internet. Eres una herramienta académica del Ecosistema Digital de Aprendizaje de Derecho del Trabajo del Decanato de Ciencias Económicas y Empresariales de la UCLA."
     )
 
     # Renderizar todos los mensajes procesados hasta ahora
