@@ -2,32 +2,26 @@ import streamlit as st
 from google import genai
 from google.genai import types
 
-# 1. CONFIGURACIÓN DE LA PÁGINA (Debe ser la primera instrucción)
+# 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layout="centered")
 
-# 2. CONFIGURACIÓN ESTRICTA DE VARIABLES NATIVAS Y ESTILOS CSS AVANZADOS
+# 2. INYECCIÓN DE ESTILOS CSS AVANZADOS (Fondo blanco absoluto y caja integrada)
 st.markdown("""
     <style>
-    /* Forzar variables globales claras en el núcleo de Streamlit */
-    :root {
-        --primary-color: #0A2540 !important;
-        --background-color: #FFFFFF !important;
-        --secondary-background-color: #F8FAFC !important;
-        --text-color: #1A202C !important;
-    }
-    
-    /* 1. Fondo blanco absoluto e inalterable en toda la infraestructura */
+    /* Forzar fondo blanco en toda la infraestructura visible y oculta */
     .stApp, 
     [data-testid="stAppViewContainer"], 
     [data-testid="stHeader"], 
     [data-testid="stSidebar"],
     [data-testid="stBottomBlockContainer"],
+    [data-testid="stBottom"],
     div[class^="st-emotion-cache"],
     .stChatMessage {
         background-color: #FFFFFF !important;
+        background: #FFFFFF !important;
     }
     
-    /* 2. Estilización tipográfica académica (Azul Oscuro) */
+    /* Estilización tipográfica institucional (Azul Oscuro) */
     .main-title {
         font-family: 'Inter', -apple-system, sans-serif;
         color: #0A2540 !important;
@@ -44,36 +38,28 @@ st.markdown("""
         padding-bottom: 15px;
     }
 
-    /* Forzar color de texto para alta legibilidad en fondo claro */
+    /* Forzar color de texto para alta legibilidad */
     p, span, li, label, .stMarkdown, h1, h2, h3 {
         color: #1A202C !important;
     }
 
-    /* 3. Corrección absoluta de la barra y el cuadro de diálogo inferior */
-    /* Eliminar cualquier fondo oscuro del contenedor general inferior */
-    [data-testid="stBottom"] {
-        background-color: #FFFFFF !important;
-        border-top: 1px solid #E2E8F0 !important;
-    }
-
-    /* Blanquear la caja externa del chat y remover herencias oscuras */
-    [data-testid="stChatInput"] {
-        background-color: #FFFFFF !important;
-    }
-
-    /* Rediseñar de forma estricta todo el marco interno del cuadro de texto */
+    /* SOLUCIÓN AL CUADRO DE ESCRITURA: Forzar fondo claro en el input y sus pseudoelementos */
+    [data-testid="stChatInput"],
     [data-testid="stChatInput"] > div,
-    [data-testid="stChatInput"] div[class^="st-emotion-cache"] {
+    [data-testid="stChatInput"] div[class^="st-emotion-cache"],
+    [data-testid="stChatInput"] textarea {
         background-color: #F8FAFC !important;
+        background: #F8FAFC !important;
+        color: #0A2540 !important;
         border: 1px solid #CBD5E1 !important;
-        border-radius: 8px !important;
     }
 
-    /* Forzar color de texto azul oscuro y fondo limpio dentro del área de escritura */
-    [data-testid="stChatInput"] textarea {
-        background-color: transparent !important;
+    /* Asegurar que el área interna de texto elimine cualquier rastro oscuro al escribir o enfocar */
+    [data-testid="stChatInput"] textarea:focus {
+        background-color: #F8FAFC !important;
         color: #0A2540 !important;
-        font-family: 'Inter', sans-serif !important;
+        border-color: #0A2540 !important;
+        box-shadow: none !important;
     }
 
     /* Ajustar el botón de envío (Flecha) */
@@ -82,7 +68,7 @@ st.markdown("""
         background-color: transparent !important;
     }
 
-    /* 4. Eliminación de componentes de desarrollo residuales */
+    /* Ocultar componentes de desarrollo */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -135,7 +121,7 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
 
     with st.chat_message("assistant"):
         if not api_key:
-            error_msg = "Error: No se encontró la configuración de la API Key ('gemini_api_key') in los Secrets de Streamlit."
+            error_msg = "Error: No se encontró la configuración de la API Key ('gemini_api_key') en los Secrets de Streamlit."
             st.error(error_msg)
             st.session_state.messages.append({"role": "assistant", "content": error_msg})
         else:
