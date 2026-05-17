@@ -163,7 +163,7 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                     st.session_state.messages.append({"role": "assistant", "content": respuesta_texto})
                     
                     # REGISTRO DE MÉTRICA EN GOOGLE SHEETS
-                    if conn:
+                    if conn is not None:
                         ahora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         nuevo_registro = pd.DataFrame([{
                             "Fecha/Hora": ahora,
@@ -172,9 +172,14 @@ if prompt := st.chat_input("Escribe tu consulta jurídica aquí..."):
                             "Respuesta_IA": respuesta_texto
                         }])
                         
-                        datos_actuales = conn.read()
-                        datos_actualizados = pd.concat([datos_actuales, nuevo_registro], ignore_index=True)
-                        conn.update(data=datos_actualizados)
+                        try:
+                            datos_actuales = conn.read()
+                            datos_actualizados = pd.concat([datos_actuales, nuevo_registro], ignore_index=True)
+                        except Exception:
+                            datos_actualizados = nuevo_registro
+                        
+                        # Uso de la sintaxis nativa robusta para actualizar la hoja
+                        conn.update(spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"], data=datos_actualizados)
                         
                 except Exception as e:
                     error_str = str(e)
