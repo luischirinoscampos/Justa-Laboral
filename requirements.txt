@@ -1,2 +1,3 @@
 streamlit
 google-genai
+st-gsheets-connection
