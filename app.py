@@ -113,7 +113,7 @@ with tab_eda:
         "- Tu propósito es guiar a quienes estudian de forma pedagógica, rigurosa aunque amable, clara, cálida y cercana.\n"
         "- Utiliza siempre un lenguaje neutral, inclusivo y formal, adecuado para el ámbito universitario.\n"
         "- Responde basándote estrictamente en la doctrina jurídica laboral, la normativa legal venezolana "
-        "vigente y los lineamientos académicos proporcionados por la cátedra.\n"
+        "vigente and los lineamientos académicos proporcionados por la cátedra.\n"
         "- Evita respuestas genéricas de asistente virtual de internet. Eres una herramienta académica del Ecosistema Digital de Aprendizaje de Derecho del Trabajo del Decanato de Ciencias Económicas y Empresariales de la UCLA."
     )
 
@@ -122,7 +122,7 @@ with tab_eda:
         with st.chat_message(message["role"], avatar=message.get("avatar")):
             st.markdown(message["content"])
 
-    # Captura del prompt (Ubicado correctamente al final del bloque de la pestaña)
+    # Captura del prompt
     prompt = st.chat_input("Escribe tu consulta jurídica aquí...", key="chat_input_eda")
 
     if prompt:
@@ -162,9 +162,9 @@ with tab_eda:
                             temperature=0.3
                         )
                         
-                        # LLAMADA AL MODELO MIGRADOCON ÉXITO A 8B PARA ALTA VELOCIDAD Y MENOR LATENCIA
+                        # IDENTIFICADOR ESTABLE SOPORTADO PARA MODELO 8B DE ALTA VELOCIDAD
                         response = client.models.generate_content(
-                            model='gemini-2.5-flash-8b', 
+                            model='gemini-1.5-flash-8b', 
                             contents=prompt, 
                             config=config
                         )
