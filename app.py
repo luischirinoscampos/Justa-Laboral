@@ -6,10 +6,10 @@ import pandas as pd
 import os
 import time
 
-# 1. CONFIGURACIÓN DE LA PÁGINA (Debe ser lo primero)
+# 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Aura - Tutora Virtual", page_icon="✨", layout="centered")
 
-# Recuperación de la API Key de Gemini desde los secretos del servidor
+# Recuperación de la API Key de Gemini desde los secretos
 api_key = st.secrets.get("gemini_api_key", None)
 
 # RUTA DEL ARCHIVO LOCAL DE BITÁCORA
@@ -28,7 +28,7 @@ def registrar_consulta_local(texto_pregunta):
     except Exception:
         pass
 
-# 2. INYECCIÓN DE ESTILOS CSS (Fondo blanco institucional, jerarquía de fuentes y centrado absoluto)
+# 2. INYECCIÓN DE ESTILOS CSS
 st.markdown("""
     <style>
     .stApp, [data-testid="stAppViewContainer"], .stChatMessage {
@@ -39,41 +39,45 @@ st.markdown("""
     div[data-testid="stToolbar"] { visibility: hidden; display: none; }
     #MainMenu, footer, [data-testid="stDecoration"] { visibility: hidden; display: none; }
     
-    /* Bloque estructurado para el centrado absoluto solicitado */
-    .brand-header-block {
+    /* Bloque de diseño de las 4 líneas centradas solicitado */
+    .custom-header {
         text-align: center;
         width: 100%;
-        margin-top: 15px;
-        margin-bottom: 5px;
+        margin-top: 10px;
+        margin-bottom: 20px;
         font-family: 'Inter', sans-serif;
     }
-    .brand-main-title { 
-        color: #0A2540 !important; 
-        font-weight: 700; 
-        font-size: 2.4rem;
-        margin: 0px 0px 2px 0px;
-        line-height: 1.2;
+    .line-1 {
+        color: #0A2540 !important;
+        font-size: 2.6rem;
+        font-weight: 700;
+        margin-bottom: 2px;
     }
-    .brand-subtitle { 
-        color: #4A5568 !important; 
-        font-weight: 500;
-        font-size: 1.4rem; 
-        margin: 0px 0px 8px 0px;
-    }
-    .brand-text-lines {
+    .line-2 {
         color: #1A202C !important;
-        font-size: 1rem;
-        margin: 0px 0px 4px 0px;
+        font-size: 1.6rem;
+        font-weight: 600;
+        margin-bottom: 8px;
     }
-    .brand-divider {
+    .line-3 {
+        color: #4A5568 !important;
+        font-size: 1.1rem;
+        font-weight: 400;
+        margin-bottom: 4px;
+    }
+    .line-4 {
+        color: #4A5568 !important;
+        font-size: 1.1rem;
+        font-weight: 400;
+        margin-bottom: 15px;
+    }
+    .line-divider {
         border-bottom: 1px solid #E2E8F0;
-        margin-top: 15px;
-        margin-bottom: 20px;
         width: 100%;
     }
     p, span, li, label, .stMarkdown, h1, h2, h3 { color: #1A202C !important; }
     
-    /* Estructura del input del chat flotante */
+    /* Input del chat flotante */
     [data-testid="stChatInput"] {
         background-color: #FFFFFF !important;
     }
@@ -93,7 +97,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Inicialización obligatoria del historial antes de renderizar pestañas
+# Inicialización obligatoria del historial antes de las pestañas
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {
@@ -111,25 +115,25 @@ if "messages" not in st.session_state:
                 "* Estudiar y repasar conceptos y contenidos temáticos esenciales.\n"
                 "* Guiar el aprendizaje de manera pedagógica y clara.\n\n"
                 "Les invito a utilizar este apoyo con responsabilidad e integridad académica. "
-                "¿Qué tema o consulta académica deseas abordar hoy?"
+                "¿Qué tema o consulta académica desean abordar hoy?"
             )
         }
     ]
 
-# Inicialización del control de tiempo para mitigar saturación de cuota
+# Inicialización del control de tiempo
 if "ultimo_envio" not in st.session_state:
     st.session_state.ultimo_envio = 0.0
 
 # =========================================================================
-# ENCABEZADO GLOBAL CONFIGURADO EXACTAMENTE SEGÚN LAS CUATRO LÍNEAS SOLICITADAS
+# ENCABEZADO SOLICITADO (4 LÍNEAS CENTRADAS, SIN COMILLAS, SIN ICONOS)
 # =========================================================================
 st.markdown("""
-    <div class="brand-header-block">
-        <div class="brand-main-title">Aura</div>
-        <div class="brand-subtitle">Tutora Académica en Línea</div>
-        <div class="brand-text-lines">Unidad Curricular: Derecho del Trabajo</div>
-        <div class="brand-text-lines">Desarrollador: Luis Ignacio Chirinos Campos</div>
-        <div class="brand-divider"></div>
+    <div class="custom-header">
+        <div class="line-1">Aura</div>
+        <div class="line-2">Tutora Académica en Línea</div>
+        <div class="line-3">Unidad Curricular: Derecho del Trabajo</div>
+        <div class="line-4">Desarrollador: Luis Ignacio Chirinos Campos</div>
+        <div class="line-divider"></div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -157,19 +161,18 @@ with tab_eda:
         "- Evita respuestas genéricas de asistente virtual de internet. Eres una herramienta académica del Ecosistema Digital de Aprendizaje (EDA) de Derecho del Trabajo del Decanato de Ciencias Económicas y Empresariales de la UCLA."
     )
 
-    # Renderizar el contenedor del historial dentro de la pestaña activa
+    # Renderizar el historial de conversación
     for message in st.session_state.messages:
         with st.chat_message(message["role"], avatar=message.get("avatar")):
             st.markdown(message["content"])
 
-    # Captura del prompt (Ubicado al final del bloque para mantener la reactividad)
+    # Entrada de texto del estudiante
     prompt = st.chat_input("Escribe tu consulta jurídica aquí...", key="chat_input_eda")
 
     if prompt:
         tiempo_actual = time.time()
         tiempo_transcurrido = tiempo_actual - st.session_state.ultimo_envio
         
-        # Restricción obligatoria de tráfico para los 100 estudiantes
         if tiempo_transcurrido < 15.0:
             tiempo_espera = int(15.0 - tiempo_transcurrido)
             st.warning(f"⏳ Para garantizar el acceso de todos los miembros del grupo, por favor espera {tiempo_espera} segundos antes de enviar otra consulta.")
@@ -177,19 +180,5 @@ with tab_eda:
             st.session_state.ultimo_envio = tiempo_actual
             registrar_consulta_local(prompt)
             
-            # Mostrar inmediatamente la consulta de quien estudia
             with st.chat_message("user", avatar="👤"):
                 st.markdown(prompt)
-            st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
-
-            # Generación de la respuesta asistida por el modelo de Gemini
-            with st.chat_message("assistant", avatar="✨"):
-                if not api_key:
-                    st.error("Error: No se encontró la configuración de la API Key ('gemini_api_key').")
-                else:
-                    try:
-                        client = genai.Client(api_key=api_key)
-                        
-                        history_contents = []
-                        for msg in st.session_state.messages[:-1]:
-                            role_mapped = "model" if msg["role"] == "assistant" else "user"
