@@ -7,7 +7,7 @@ import os
 import time
 
 # 1. CONFIGURACIÓN DE LA PÁGINA (Debe ser lo primero)
-st.set_page_config(page_title="Aura - Tutora Virtual", page_icon="⚖️", layout="centered")
+st.set_page_config(page_title="Aura - Tutora Virtual", page_icon="✨", layout="centered")
 
 # Recuperación de la API Key de Gemini
 api_key = st.secrets.get("gemini_api_key", None)
@@ -71,7 +71,7 @@ if "messages" not in st.session_state:
             "avatar": "⚖️",
             "content": (
                 "### ¡Bienvenido(a)!\n\n"
-                "Hola. Soy **Justa**, tutora académica virtual del EDA de **Derecho del Trabajo**, "
+                "Hola. Soy **Aura**, tutora académica virtual del EDA de **Derecho del Trabajo**, "
                 "espacio académico gestionado por Luis Ignacio Chirinos Campos.\n\n"
                 "Cuento con la preparación para brindarte orientación, guía y acompañamiento en todo lo relacionado "
                 "con el contenido temático de nuestra unidad curricular. Mis respuestas se fundamentan de forma estricta "
