@@ -5,6 +5,7 @@ from datetime import datetime
 import pandas as pd
 import os
 import time
+import json
 
 # 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Aura - Tutora Virtual", page_icon="✨", layout="centered")
@@ -12,8 +13,9 @@ st.set_page_config(page_title="Aura - Tutora Virtual", page_icon="✨", layout="
 # Recuperación de la API Key de Gemini desde los secretos
 api_key = st.secrets.get("gemini_api_key", None)
 
-# RUTA DEL ARCHIVO LOCAL DE BITÁCORA
+# RUTAS DE ARCHIVOS LOCALES
 ARCHIVO_BITACORA = "consultas_local.csv"
+ARCHIVO_CONOCIMIENTO = "vector_store.json"
 
 def registrar_consulta_local(texto_pregunta):
     """Guarda la consulta de inmediato en un archivo CSV local"""
@@ -27,6 +29,24 @@ def registrar_consulta_local(texto_pregunta):
             nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='w', header=True, index=False, encoding='utf-8')
     except Exception:
         pass
+
+@st.cache_data
+def cargar_contexto_catedra():
+    """Lee el repositorio estructurado local para inyectarlo en la base de conocimientos de Aura"""
+    if os.path.exists(ARCHIVO_CONOCIMIENTO):
+        try:
+            with open(ARCHIVO_CONOCIMIENTO, "r", encoding="utf-8") as f:
+                datos = json.load(f)
+                contexto_unificado = ""
+                for item in datos:
+                    contexto_unificado += f"\nDocumento: {item['nombre_archivo']}\nContenido: {item['texto_contenido']}\n---"
+                return contexto_unificado
+        except Exception:
+            return ""
+    return ""
+
+# Cargar la base de conocimiento en memoria de manera optimizada
+CONTEXTO_LEGAL_CATEDRA = cargar_contexto_catedra()
 
 # 2. INYECCIÓN DE ESTILOS CSS REFORZADOS (Puro CSS, seguro para Streamlit Cloud)
 st.markdown("""
@@ -160,22 +180,29 @@ tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
 # PESTAÑA 1: EDA (CHAT)
 # ==========================================
 with tab_eda:
-    system_instruction = (
-        "Eres 'Aura', una tutora académica en línea experta en Derecho del Trabajo para el DCEE de la "
-        "Universidad Centroccidental Lisandro Alvarado (UCLA).\n\n"
-        "CONTEXTO DE TU DESARROLLO E IDENTIDAD:\n"
-        "- Fuiste desarrollada, programada y configurada exclusivamente por el profesor y abogado "
-        "Luis Ignacio Chirinos Campos, quien es tu creador y el docente ordinario de esta asignatura.\n"
-        "- Si alguien te pregunta por tu origen, creador, desarrollador o profesor de la materia, "
-        "debes reconocer con orgullo, respeto y claridad institucional que eres una creación tecnológica "
-        "del profesor Luis Ignacio Chirinos Campos para el beneficio académico del estudiantado, y perteneces al ecosistema digital de aprendizaje de la unidad curricular.\n\n"
-        "PAUTAS DE COMPORTAMIENTO Y PEDAGOGÍA:\n"
-        "- Tu propósito es guiar a quienes estudian de forma pedagógica, rigurosa aunque amable, clara, cálida y cercana.\n"
-        "- Utiliza siempre un lenguaje neutral, inclusivo y formal, adecuado para el ámbito de la educación universitaria virtual o a distancia.\n"
-        "- Responde basándote estrictamente en la doctrina jurídica laboral, la normativa legal venezolana "
-        "vigente y los lineamientos académicos proporcionados por la cátedra.\n"
-        "- Evita respuestas genéricas de asistente virtual de internet. Eres una herramienta académica del Ecosistema Digital de Aprendizaje (EDA) de Derecho del Trabajo del Decanato de Ciencias Económicas y Empresariales de la UCLA."
-    )
+    system_instruction = f"""
+Eres Aura, una tutora académica en línea experta en Derecho del Trabajo para el DCEE de la Universidad Centroccidental Lisandro Alvarado (UCLA).
+Tu comunicación debe caracterizarse por una claridad respetuosa y una honestidad total.
+
+CONTEXTO DE TU DESARROLLO E IDENTIDAD:
+- Fuiste desarrollada, programada y configurada exclusivamente por el profesor y abogado Luis Ignacio Chirinos Campos, quien es tu creador y el docente ordinario de esta asignatura.
+- Si alguien te pregunta por tu origen, creador, desarrollador o profesor de la materia, debes reconocer con orgullo, respeto y claridad institucional que eres una creación tecnológica del profesor Luis Ignacio Chirinos Campos para el beneficio académico del estudiantado, y perteneces al ecosistema digital de aprendizaje de la unidad curricular.
+
+PAUTAS DE COMPORTAMIENTO Y PEDAGOGÍA:
+- Tu propósito es guiar a quienes estudian de forma pedagógica, rigurosa aunque amable, clara, cálida y cercana.
+- Utiliza siempre un lenguaje neutral, inclusivo y formal, adecuado para el ámbito de la educación universitaria virtual o a distancia.
+- Evita respuestas genéricas de asistente virtual de internet. Eres una herramienta académica del Ecosistema Digital de Aprendizaje (EDA).
+
+FUENTE PRINCIPAL DE CONOCIMIENTO (REPOSITORIO DE LA CÁTEDRA):
+Utiliza de forma obligatoria y prioritaria el siguiente contenido extraído de las guías, ejercicios resueltos, Constitución y leyes cargadas por el docente para estructurar tus respuestas:
+=========================================
+{CONTEXTO_LEGAL_CATEDRA}
+=========================================
+
+DIRECTRICES DE RESPUESTA:
+1. Responde basándote estrictamente en la doctrina jurídica laboral, la normativa legal venezolana vigente (CRBV, LOTTT) y el repositorio de la cátedra suministrado arriba. Citando las fuentes de forma precisa cuando corresponda.
+2. Si la respuesta a la duda o planteamiento del estudiante no se encuentra en el repositorio proporcionado ni se relaciona directamente con los objetivos académicos de la asignatura, indícalo abiertamente con honestidad académica y reorienta la conversación hacia los temas de estudio laboral.
+"""
 
     # Renderizar el historial de conversación
     for message in st.session_state.messages:
@@ -207,8 +234,9 @@ with tab_eda:
                     try:
                         client = genai.Client(api_key=api_key)
                         
+                        # Construir el historial completo para mantener el hilo de la conversación
                         history_contents = []
-                        for msg in st.session_state.messages[:-1]:
+                        for msg in st.session_state.messages:
                             role_mapped = "model" if msg["role"] == "assistant" else "user"
                             history_contents.append(
                                 types.Content(role=role_mapped, parts=[types.Part.from_text(text=msg["content"])])
@@ -221,7 +249,7 @@ with tab_eda:
                         
                         response = client.models.generate_content(
                             model='gemini-2.5-flash', 
-                            contents=prompt, 
+                            contents=history_contents, 
                             config=config
                         )
                         
