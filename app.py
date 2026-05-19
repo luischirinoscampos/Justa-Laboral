@@ -28,21 +28,23 @@ def registrar_consulta_local(texto_pregunta):
     except Exception:
         pass
 
-# 2. INYECCIÓN DE ESTILOS CSS REFORZADOS PARA INCRUSTACIÓN EN MOODLE (IFRAME)
+# 2. INYECCIÓN DE ESTILOS CSS REFORZADOS (Puro CSS, seguro para Streamlit Cloud)
 st.markdown("""
     <style>
-    /* Forzar comportamiento estricto dentro de marcos (Evita ventanas emergentes) */
+    /* Forzar fondo blanco y asegurar el confinamiento en el contenedor del Iframe */
     html, body, [data-testid="stAppViewContainer"] {
         background-color: #FFFFFF !important;
         background: #FFFFFF !important;
+        overflow-x: hidden !important;
     }
     
-    /* Optimización de espacios para visualización embebida en Moodle */
+    /* Optimización de márgenes para entornos educativos embebidos (Moodle) */
     .block-container {
         padding-top: 1rem !important;
         padding-bottom: 1rem !important;
         padding-left: 1rem !important;
         padding-right: 1rem !important;
+        max-width: 100% !important;
     }
     
     .stApp, .stChatMessage {
@@ -109,20 +111,6 @@ st.markdown("""
         background-color: transparent !important;
     }
     </style>
-    
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            // Re-direcciona de forma estricta los clicks hacia el propio frame
-            const bases = document.getElementsByTagName('base');
-            if (bases.length > 0) {
-                bases[0].target = "_self";
-            } else {
-                const baseNode = document.createElement('base');
-                baseNode.target = "_self";
-                document.head.appendChild(baseNode);
-            }
-        });
-    </script>
 """, unsafe_allow_html=True)
 
 # Inicialización obligatoria del historial antes de las pestañas
