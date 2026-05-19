@@ -9,7 +9,7 @@ import time
 # 1. CONFIGURACIÓN DE LA PÁGINA (Debe ser lo primero)
 st.set_page_config(page_title="Aura - Tutora Virtual", page_icon="✨", layout="centered")
 
-# Recuperación de la API Key de Gemini desde los secretos del servidor
+# Recuperación de la API Key de Gemini
 api_key = st.secrets.get("gemini_api_key", None)
 
 # RUTA DEL ARCHIVO LOCAL DE BITÁCORA
@@ -90,18 +90,21 @@ if "messages" not in st.session_state:
 if "ultimo_envio" not in st.session_state:
     st.session_state.ultimo_envio = 0.0
 
-# 3. ESTRUCTURA DE PESTAÑAS NATIVAS
-tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
+# 3. CAPTURA DEL INPUT EN LA RAÍZ (Esto obliga a Streamlit a fijarlo abajo del todo)
+prompt = st.chat_input("Escribe tu consulta jurídica aquí...")
+
+# 4. ESTRUCTURA DE PESTAÑAS
+tab_chat, tab_docente = st.tabs(["💬 Aula Virtual", "🔐 Control Docente"])
 
 # ==========================================
-# PESTAÑA 1: EDA (CHAT)
+# PESTAÑA 1: AULA VIRTUAL (CHAT)
 # ==========================================
-with tab_eda:
-    st.markdown('<h1 class="main-title">⚖️ <strong>Aura</strong>: Tutora Académica Virtual</h1>', unsafe_allow_html=True)
+with tab_chat:
+    st.markdown('<h1 class="main-title">⚖️ Justa: Tutora Académica Virtual</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-caption">Asignatura: Derecho del Trabajo | Docencia: Luis Ignacio Chirinos Campos</p>', unsafe_allow_html=True)
 
     system_instruction = (
-        "Eres Aura, una tutora académica experta en Derecho del Trabajo para el DCEE de la "
+        "Eres 'Justa', una tutora académica experta en Derecho del Trabajo para el DCEE de la "
         "Universidad Centroccidental Lisandro Alvarado (UCLA).\n\n"
         "CONTEXTO DE TU DESARROLLO E IDENTIDAD:\n"
         "- Fuiste desarrollada, programada y configurada exclusivamente por el profesor y abogado "
@@ -117,32 +120,32 @@ with tab_eda:
         "- Evita respuestas genéricas de asistente virtual de internet. Eres una herramienta académica del Ecosistema Digital de Aprendizaje de Derecho del Trabajo del Decanato de Ciencias Económicas y Empresariales de la UCLA."
     )
 
-    # Renderizar el contenedor del historial dentro de la pestaña activa
+    # Renderizar todos los mensajes procesados hasta ahora
     for message in st.session_state.messages:
         with st.chat_message(message["role"], avatar=message.get("avatar")):
             st.markdown(message["content"])
 
-    # Captura del prompt (Ubicado correctamente al final del bloque de la pestaña)
-    prompt = st.chat_input("Escribe tu consulta jurídica aquí...", key="chat_input_eda")
-
+    # Si hay una nueva entrada desde el fondo de la pantalla, se procesa aquí adentro
     if prompt:
         tiempo_actual = time.time()
         tiempo_transcurrido = tiempo_actual - st.session_state.ultimo_envio
         
-        # Restricción obligatoria de tráfico
+        # Restricción obligatoria: 15 segundos entre interacciones por usuario
         if tiempo_transcurrido < 15.0:
             tiempo_espera = int(15.0 - tiempo_transcurrido)
             st.warning(f"⏳ Para garantizar el acceso de todos sus compañeros(as), por favor espere {tiempo_espera} segundos antes de enviar otra consulta.")
         else:
+            # Actualizar la marca de tiempo del último envío válido
             st.session_state.ultimo_envio = tiempo_actual
+            
             registrar_consulta_local(prompt)
             
-            # Mostrar inmediatamente la consulta del alumno
+            # Mostrar el mensaje del estudiante
             with st.chat_message("user", avatar="👤"):
                 st.markdown(prompt)
             st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
 
-            # Generación de la respuesta asistida por IA
+            # Generar respuesta de Justa
             with st.chat_message("assistant", avatar="⚖️"):
                 if not api_key:
                     st.error("Error: No se encontró la configuración de la API Key ('gemini_api_key').")
@@ -171,6 +174,7 @@ with tab_eda:
                         st.markdown(response.text)
                         st.session_state.messages.append({"role": "assistant", "avatar": "⚖️", "content": response.text})
                         
+                        # Forzar recarga limpia para pintar el nuevo mensaje en el orden correcto
                         st.rerun()
                         
                     except Exception as e:
@@ -179,9 +183,9 @@ with tab_eda:
                         st.error(clean_error)
 
 # ==========================================
-# PESTAÑA 2: PROFESOR
+# PESTAÑA 2: CONTROL DOCENTE
 # ==========================================
-with tab_profesor:
+with tab_docente:
     st.markdown('<h2 class="main-title">🔐 Panel de Gestión Académica</h2>', unsafe_allow_html=True)
     clave = st.text_input("Introduzca credencial docente:", type="password", key="docente_password")
 
@@ -199,7 +203,7 @@ with tab_profesor:
                     st.download_button(
                         label="📥 Descargar Reporte Completo (CSV)",
                         data=csv_data,
-                        file_name=f"interacciones_aura_{datetime.now().strftime('%d_%m_%Y')}.csv",
+                        file_name=f"interacciones_justa_{datetime.now().strftime('%d_%m_%Y')}.csv",
                         mime="text/csv"
                     )
                 else:
@@ -208,5 +212,3 @@ with tab_profesor:
                 st.error(f"Error al leer la bitácora local: {e}")
         else:
             st.info("Aún no se registran interacciones en este servidor.")
-
-```
