@@ -1,0 +1,12 @@
+# Archivos de datos y bases de conocimiento
+vector_store.json
+*.csv
+*.json
+
+# Archivos de entorno y credenciales
+.env
+.streamlit/secrets.toml
+
+# Caché y archivos de sistema
+__pycache__/
+.DS_Store
