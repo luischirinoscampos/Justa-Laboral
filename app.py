@@ -9,7 +9,7 @@ import time
 # 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Aura - Tutora Virtual", page_icon="✨", layout="centered")
 
-# Recuperación de la API Key de Gemini desde los secretos del servidor
+# Recuperación de la API Key de Gemini desde los secretos
 api_key = st.secrets.get("gemini_api_key", None)
 
 # RUTA DEL ARCHIVO LOCAL DE BITÁCORA
@@ -28,7 +28,7 @@ def registrar_consulta_local(texto_pregunta):
     except Exception:
         pass
 
-# 2. INYECCIÓN DE ESTILOS CSS (Optimizado para visualización incrustada en Moodle)
+# 2. INYECCIÓN DE ESTILOS CSS
 st.markdown("""
     <style>
     .stApp, [data-testid="stAppViewContainer"], .stChatMessage {
@@ -39,47 +39,45 @@ st.markdown("""
     div[data-testid="stToolbar"] { visibility: hidden; display: none; }
     #MainMenu, footer, [data-testid="stDecoration"] { visibility: hidden; display: none; }
     
-    /* Bloque estructurado para las 4 líneas centradas */
-    .brand-header-block {
+    /* Bloque de diseño de las 4 líneas centradas solicitado */
+    .custom-header {
         text-align: center;
         width: 100%;
         margin-top: 10px;
-        margin-bottom: 5px;
+        margin-bottom: 20px;
         font-family: 'Inter', sans-serif;
     }
-    .brand-line-1 { 
-        color: #0A2540 !important; 
-        font-weight: 700; 
-        font-size: 2.4rem;
-        margin: 0px 0px 2px 0px;
-        line-height: 1.2;
+    .line-1 {
+        color: #0A2540 !important;
+        font-size: 2.6rem;
+        font-weight: 700;
+        margin-bottom: 2px;
     }
-    .brand-line-2 { 
-        color: #1A202C !important; 
+    .line-2 {
+        color: #1A202C !important;
+        font-size: 1.6rem;
         font-weight: 600;
-        font-size: 1.4rem; 
-        margin: 0px 0px 8px 0px;
+        margin-bottom: 8px;
     }
-    .brand-line-3 {
+    .line-3 {
         color: #4A5568 !important;
-        font-weight: 400;
         font-size: 1.1rem;
-        margin: 0px 0px 4px 0px;
+        font-weight: 400;
+        margin-bottom: 4px;
     }
-    .brand-line-4 {
+    .line-4 {
         color: #4A5568 !important;
-        font-weight: 400;
         font-size: 1.1rem;
-        margin: 0px 0px 15px 0px;
+        font-weight: 400;
+        margin-bottom: 15px;
     }
-    .brand-divider {
+    .line-divider {
         border-bottom: 1px solid #E2E8F0;
-        margin-bottom: 20px;
         width: 100%;
     }
     p, span, li, label, .stMarkdown, h1, h2, h3 { color: #1A202C !important; }
     
-    /* Estructura del input del chat flotante */
+    /* Input del chat flotante */
     [data-testid="stChatInput"] {
         background-color: #FFFFFF !important;
     }
@@ -99,7 +97,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Inicialización obligatoria del historial antes de renderizar pestañas
+# Inicialización obligatoria del historial antes de las pestañas
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {
@@ -117,34 +115,35 @@ if "messages" not in st.session_state:
                 "* Estudiar y repasar conceptos y contenidos temáticos esenciales.\n"
                 "* Guiar el aprendizaje de manera pedagógica y clara.\n\n"
                 "Les invito a utilizar este apoyo con responsabilidad e integridad académica. "
-                "¿Qué tema o consulta académica deseas abordar hoy?"
+                "¿Qué tema o consulta académica desean abordar hoy?"
             )
         }
     ]
 
+# Inicialización del control de tiempo
 if "ultimo_envio" not in st.session_state:
     st.session_state.ultimo_envio = 0.0
 
 # =========================================================================
-# ENCABEZADO GLOBAL (4 líneas verticales perfectamente centradas en la raíz)
+# ENCABEZADO SOLICITADO (4 LÍNEAS CENTRADAS, SIN COMILLAS, SIN ICONOS)
 # =========================================================================
 st.markdown("""
-    <div class="brand-header-block">
-        <div class="brand-line-1">Aura</div>
-        <div class="brand-line-2">Tutora Académica en Línea</div>
-        <div class="brand-line-3">Unidad Curricular: Derecho del Trabajo</div>
-        <div class="brand-line-4">Desarrollador: Luis Ignacio Chirinos Campos</div>
-        <div class="brand-divider"></div>
+    <div class="custom-header">
+        <div class="line-1">Aura</div>
+        <div class="line-2">Tutora Académica en Línea</div>
+        <div class="line-3">Unidad Curricular: Derecho del Trabajo</div>
+        <div class="line-4">Desarrollador: Luis Ignacio Chirinos Campos</div>
+        <div class="line-divider"></div>
     </div>
 """, unsafe_allow_html=True)
 
 # 3. ESTRUCTURA DE PESTAÑAS NATIVAS
-tab_chat, tab_docente = st.tabs(["💬 Aula Virtual", "🔐 Control Docente"])
+tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
 
 # ==========================================
-# PESTAÑA 1: AULA VIRTUAL (CHAT EN LÍNEA)
+# PESTAÑA 1: EDA (CHAT)
 # ==========================================
-with tab_chat:
+with tab_eda:
     system_instruction = (
         "Eres 'Aura', una tutora académica en línea experta en Derecho del Trabajo para el DCEE de la "
         "Universidad Centroccidental Lisandro Alvarado (UCLA).\n\n"
@@ -162,13 +161,13 @@ with tab_chat:
         "- Evita respuestas genéricas de asistente virtual de internet. Eres una herramienta académica del Ecosistema Digital de Aprendizaje (EDA) de Derecho del Trabajo del Decanato de Ciencias Económicas y Empresariales de la UCLA."
     )
 
-    # Renderizar el historial de conversación dentro de la pestaña
+    # Renderizar el historial de conversación
     for message in st.session_state.messages:
         with st.chat_message(message["role"], avatar=message.get("avatar")):
             st.markdown(message["content"])
 
-    # Captura segura del prompt interno en la pestaña para iFrames
-    prompt = st.chat_input("Escribe tu consulta jurídica aquí...", key="chat_input_aula")
+    # Entrada de texto del estudiante
+    prompt = st.chat_input("Escribe tu consulta jurídica aquí...", key="chat_input_eda")
 
     if prompt:
         tiempo_actual = time.time()
@@ -204,7 +203,6 @@ with tab_chat:
                             temperature=0.3
                         )
                         
-                        # Corrección definitiva: Uso del modelo estable oficial
                         response = client.models.generate_content(
                             model='gemini-2.5-flash', 
                             contents=prompt, 
@@ -222,9 +220,9 @@ with tab_chat:
                         st.error(clean_error)
 
 # ==========================================
-# PESTAÑA 2: CONTROL DOCENTE
+# PESTAÑA 2: PROFESOR
 # ==========================================
-with tab_docente:
+with tab_profesor:
     st.subheader("Bitácora de Consultas Locales")
     clave = st.text_input("Introduzca credencial docente:", type="password", key="docente_password")
 
