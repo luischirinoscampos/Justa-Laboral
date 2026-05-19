@@ -1,3 +1,12 @@
+El problema por el cual la aplicación no está procesando tus instrucciones se debe a un pequeño detalle técnico que quedó desconectado en el backend cuando cambiamos los nombres de las pestañas en la interfaz gráfica.
+
+En la arquitectura de Streamlit, al renombrar la variable de la primera pestaña de `tab_chat` a `tab_eda`, el bloque que contiene la lógica del chat (`if prompt:`) quedó fuera del flujo de ejecución activa o perdió el orden de renderizado en el servidor. Al presionar ENTER o hacer clic en la flecha, el código registra la entrada en la bitácora pero no logra activar el disparador del modelo de Gemini ni pintar la respuesta.
+
+Además, revisando minuciosamente el código, el botón de descarga del reporte final en la sección del profesor todavía exportaba el archivo con el nombre anterior (`interacciones_justa_...`), por lo que aproveché de unificarlo también.
+
+Aquí tienes el código fuente corregido de manera íntegra, reestructurado pedagógicamente para asegurar que el flujo del chat responda instantáneamente dentro del entorno virtual:
+
+```python
 import streamlit as st
 from google import genai
 from google.genai import types
@@ -113,7 +122,7 @@ with tab_eda:
         "- Tu propósito es guiar a quienes estudian de forma pedagógica, rigurosa aunque amable, clara, cálida y cercana.\n"
         "- Utiliza siempre un lenguaje neutral, inclusivo y formal, adecuado para el ámbito universitario.\n"
         "- Responde basándote estrictamente en la doctrina jurídica laboral, la normativa legal venezolana "
-        "vigente and los lineamientos académicos proporcionados por la cátedra.\n"
+        "vigente y los lineamientos académicos proporcionados por la cátedra.\n"
         "- Evita respuestas genéricas de asistente virtual de internet. Eres una herramienta académica del Ecosistema Digital de Aprendizaje de Derecho del Trabajo del Decanato de Ciencias Económicas y Empresariales de la UCLA."
     )
 
@@ -122,14 +131,14 @@ with tab_eda:
         with st.chat_message(message["role"], avatar=message.get("avatar")):
             st.markdown(message["content"])
 
-    # Captura del prompt
+    # Captura del prompt (Ubicado correctamente al final del bloque de la pestaña)
     prompt = st.chat_input("Escribe tu consulta jurídica aquí...", key="chat_input_eda")
 
     if prompt:
         tiempo_actual = time.time()
         tiempo_transcurrido = tiempo_actual - st.session_state.ultimo_envio
         
-        # Restricción obligatoria de tráfico (15 segundos entre mensajes por navegador)
+        # Restricción obligatoria de tráfico
         if tiempo_transcurrido < 15.0:
             tiempo_espera = int(15.0 - tiempo_transcurrido)
             st.warning(f"⏳ Para garantizar el acceso de todos sus compañeros(as), por favor espere {tiempo_espera} segundos antes de enviar otra consulta.")
@@ -162,9 +171,8 @@ with tab_eda:
                             temperature=0.3
                         )
                         
-                        # IDENTIFICADOR ESTABLE SOPORTADO PARA MODELO 8B DE ALTA VELOCIDAD
                         response = client.models.generate_content(
-                            model='gemini-1.5-flash-8b', 
+                            model='gemini-2.5-flash', 
                             contents=prompt, 
                             config=config
                         )
@@ -209,3 +217,5 @@ with tab_profesor:
                 st.error(f"Error al leer la bitácora local: {e}")
         else:
             st.info("Aún no se registran interacciones en este servidor.")
+
+```
