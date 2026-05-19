@@ -28,7 +28,7 @@ def registrar_consulta_local(texto_pregunta):
     except Exception:
         pass
 
-# 2. INYECCIÓN DE ESTILOS CSS (Fondo blanco institucional, centrado absoluto y limpieza visual)
+# 2. INYECCIÓN DE ESTILOS CSS (Fondo blanco institucional, jerarquía de fuentes y centrado absoluto)
 st.markdown("""
     <style>
     .stApp, [data-testid="stAppViewContainer"], .stChatMessage {
@@ -39,36 +39,41 @@ st.markdown("""
     div[data-testid="stToolbar"] { visibility: hidden; display: none; }
     #MainMenu, footer, [data-testid="stDecoration"] { visibility: hidden; display: none; }
     
-    /* Contenedor centralizado global para los títulos principales */
-    .centered-header-block {
+    /* Bloque estructurado para el centrado absoluto solicitado */
+    .brand-header-block {
         text-align: center;
         width: 100%;
-        margin-top: 10px;
+        margin-top: 15px;
         margin-bottom: 5px;
+        font-family: 'Inter', sans-serif;
     }
-    .main-title { 
-        font-family: 'Inter', sans-serif; 
+    .brand-main-title { 
         color: #0A2540 !important; 
         font-weight: 700; 
-        text-align: center;
-        font-size: 2.2rem;
-        margin: 0px 0px 5px 0px;
+        font-size: 2.4rem;
+        margin: 0px 0px 2px 0px;
+        line-height: 1.2;
     }
-    .sub-caption { 
-        font-family: 'Inter', sans-serif; 
+    .brand-subtitle { 
         color: #4A5568 !important; 
-        font-size: 1rem; 
-        text-align: center;
-        margin: 0px 0px 15px 0px;
+        font-weight: 500;
+        font-size: 1.4rem; 
+        margin: 0px 0px 8px 0px;
     }
-    .header-divider {
+    .brand-text-lines {
+        color: #1A202C !important;
+        font-size: 1rem;
+        margin: 0px 0px 4px 0px;
+    }
+    .brand-divider {
         border-bottom: 1px solid #E2E8F0;
+        margin-top: 15px;
         margin-bottom: 20px;
         width: 100%;
     }
     p, span, li, label, .stMarkdown, h1, h2, h3 { color: #1A202C !important; }
     
-    /* Estructura del input del chat flotante abajo en la raíz */
+    /* Estructura del input del chat flotante */
     [data-testid="stChatInput"] {
         background-color: #FFFFFF !important;
     }
@@ -106,7 +111,7 @@ if "messages" not in st.session_state:
                 "* Estudiar y repasar conceptos y contenidos temáticos esenciales.\n"
                 "* Guiar el aprendizaje de manera pedagógica y clara.\n\n"
                 "Les invito a utilizar este apoyo con responsabilidad e integridad académica. "
-                "¿Qué tema o consulta académica desean abordar hoy?"
+                "¿Qué tema o consulta académica deseas abordar hoy?"
             )
         }
     ]
@@ -116,13 +121,15 @@ if "ultimo_envio" not in st.session_state:
     st.session_state.ultimo_envio = 0.0
 
 # =========================================================================
-# ENCABEZADO GLOBAL (Ubicado en la raíz para garantizar centrado absoluto)
+# ENCABEZADO GLOBAL CONFIGURADO EXACTAMENTE SEGÚN LAS CUATRO LÍNEAS SOLICITADAS
 # =========================================================================
 st.markdown("""
-    <div class="centered-header-block">
-        <h1 class="main-title">Aura: Tutora Académica en Línea</h1>
-        <p class="sub-caption">Unidad Curricular: Derecho del Trabajo | Prof: Luis Ignacio Chirinos Campos</p>
-        <div class="header-divider"></div>
+    <div class="brand-header-block">
+        <div class="brand-main-title">Aura</div>
+        <div class="brand-subtitle">Tutora Académica en Línea</div>
+        <div class="brand-text-lines">Unidad Curricular: Derecho del Trabajo</div>
+        <div class="brand-text-lines">Desarrollador: Luis Ignacio Chirinos Campos</div>
+        <div class="brand-divider"></div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -155,7 +162,7 @@ with tab_eda:
         with st.chat_message(message["role"], avatar=message.get("avatar")):
             st.markdown(message["content"])
 
-    # Captura del prompt (Ubicado correctamente al final del bloque de la pestaña)
+    # Captura del prompt (Ubicado al final del bloque para mantener la reactividad)
     prompt = st.chat_input("Escribe tu consulta jurídica aquí...", key="chat_input_eda")
 
     if prompt:
@@ -186,57 +193,3 @@ with tab_eda:
                         history_contents = []
                         for msg in st.session_state.messages[:-1]:
                             role_mapped = "model" if msg["role"] == "assistant" else "user"
-                            history_contents.append(
-                                types.Content(role=role_mapped, parts=[types.Part.from_text(text=msg["content"])])
-                            )
-                        
-                        config = types.GenerateContentConfig(
-                            system_instruction=system_instruction, 
-                            temperature=0.3
-                        )
-                        
-                        response = client.models.generate_content(
-                            model='gemini-2.5-flash', 
-                            contents=prompt, 
-                            config=config
-                        )
-                        
-                        st.markdown(response.text)
-                        st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": response.text})
-                        
-                        st.rerun()
-                        
-                    except Exception as e:
-                        error_str = str(e)
-                        clean_error = "Se ha agotado la cuota temporal de consultas de la API. El servicio se restablecerá pronto." if "RESOURCE_EXHAUSTED" in error_str else f"Ocurrió un inconveniente: {error_str}"
-                        st.error(clean_error)
-
-# ==========================================
-# PESTAÑA 2: PROFESOR
-# ==========================================
-with tab_profesor:
-    st.subheader("Bitácora de Consultas Locales")
-    clave = st.text_input("Introduzca credencial docente:", type="password", key="docente_password")
-
-    if clave == "UCLA2026":
-        st.success("Acceso Docente Verificado")
-        
-        if os.path.exists(ARCHIVO_BITACORA):
-            try:
-                df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
-                if not df_log.empty:
-                    st.dataframe(df_log.iloc[::-1], use_container_width=True)
-                    
-                    csv_data = df_log.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label="📥 Descargar Reporte Completo (CSV)",
-                        data=csv_data,
-                        file_name=f"interacciones_aura_{datetime.now().strftime('%d_%m_%Y')}.csv",
-                        mime="text/csv"
-                    )
-                else:
-                    st.info("El archivo de bitácora está vacío.")
-            except Exception as e:
-                st.error(f"Error al leer la bitácora local: {e}")
-        else:
-            st.info("Aún no se registran interacciones en este servidor.")
