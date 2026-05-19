@@ -129,7 +129,7 @@ with tab_eda:
         tiempo_actual = time.time()
         tiempo_transcurrido = tiempo_actual - st.session_state.ultimo_envio
         
-        # Restricción obligatoria de tráfico
+        # Restricción obligatoria de tráfico (15 segundos entre mensajes por navegador)
         if tiempo_transcurrido < 15.0:
             tiempo_espera = int(15.0 - tiempo_transcurrido)
             st.warning(f"⏳ Para garantizar el acceso de todos sus compañeros(as), por favor espere {tiempo_espera} segundos antes de enviar otra consulta.")
@@ -162,8 +162,9 @@ with tab_eda:
                             temperature=0.3
                         )
                         
+                        # LLAMADA AL MODELO MIGRADOCON ÉXITO A 8B PARA ALTA VELOCIDAD Y MENOR LATENCIA
                         response = client.models.generate_content(
-                            model='gemini-2.5-flash', 
+                            model='gemini-2.5-flash-8b', 
                             contents=prompt, 
                             config=config
                         )
