@@ -7,7 +7,7 @@ import os
 import time
 
 # 1. CONFIGURACIÓN DE LA PÁGINA (Debe ser lo primero)
-st.set_page_config(page_title="Justa - Tutora Virtual", page_icon="⚖️", layout="centered")
+st.set_page_config(page_title="Aura - Tutora Virtual", page_icon="⚖️", layout="centered")
 
 # Recuperación de la API Key de Gemini
 api_key = st.secrets.get("gemini_api_key", None)
