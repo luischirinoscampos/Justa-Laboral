@@ -121,7 +121,7 @@ if "messages" not in st.session_state:
             "avatar": "✨",
             "content": (
                 "### ¡Bienvenido(a)!\n\n"
-                "Hola. Les saluda **Aura**, tutora académica en línea del EDA de **Derecho del Trabajo**, "
+                "Hola. Soy **Aura**, tutora académica en línea del EDA de **Derecho del Trabajo**, "
                 "un espacio académico gestionado por el Prof: Luis Ignacio Chirinos Campos.\n\n"
                 "Cuento con la preparación para brindarles orientación, guía y acompañamiento en todo lo relacionado "
                 "con el contenido temático de nuestra unidad curricular. Las respuestas emitidas se fundamentan de forma estricta "
