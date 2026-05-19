@@ -28,10 +28,24 @@ def registrar_consulta_local(texto_pregunta):
     except Exception:
         pass
 
-# 2. INYECCIÓN DE ESTILOS CSS
+# 2. INYECCIÓN DE ESTILOS CSS REFORZADOS PARA INCRUSTACIÓN EN MOODLE (IFRAME)
 st.markdown("""
     <style>
-    .stApp, [data-testid="stAppViewContainer"], .stChatMessage {
+    /* Forzar comportamiento estricto dentro de marcos (Evita ventanas emergentes) */
+    html, body, [data-testid="stAppViewContainer"] {
+        background-color: #FFFFFF !important;
+        background: #FFFFFF !important;
+    }
+    
+    /* Optimización de espacios para visualización embebida en Moodle */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    
+    .stApp, .stChatMessage {
         background-color: #FFFFFF !important;
         background: #FFFFFF !important;
     }
@@ -43,33 +57,33 @@ st.markdown("""
     .custom-header {
         text-align: center;
         width: 100%;
-        margin-top: 10px;
-        margin-bottom: 20px;
+        margin-top: 5px;
+        margin-bottom: 15px;
         font-family: 'Inter', sans-serif;
     }
     .line-1 {
         color: #0A2540 !important;
-        font-size: 2.6rem;
+        font-size: 2.4rem;
         font-weight: 700;
         margin-bottom: 2px;
     }
     .line-2 {
         color: #1A202C !important;
-        font-size: 1.6rem;
+        font-size: 1.4rem;
         font-weight: 600;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
     }
     .line-3 {
         color: #4A5568 !important;
-        font-size: 1.1rem;
+        font-size: 1.05rem;
         font-weight: 400;
         margin-bottom: 4px;
     }
     .line-4 {
         color: #4A5568 !important;
-        font-size: 1.1rem;
+        font-size: 1.05rem;
         font-weight: 400;
-        margin-bottom: 15px;
+        margin-bottom: 12px;
     }
     .line-divider {
         border-bottom: 1px solid #E2E8F0;
@@ -77,7 +91,7 @@ st.markdown("""
     }
     p, span, li, label, .stMarkdown, h1, h2, h3 { color: #1A202C !important; }
     
-    /* Input del chat flotante */
+    /* Input del chat flotante adaptivo */
     [data-testid="stChatInput"] {
         background-color: #FFFFFF !important;
     }
@@ -95,6 +109,20 @@ st.markdown("""
         background-color: transparent !important;
     }
     </style>
+    
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            // Re-direcciona de forma estricta los clicks hacia el propio frame
+            const bases = document.getElementsByTagName('base');
+            if (bases.length > 0) {
+                bases[0].target = "_self";
+            } else {
+                const baseNode = document.createElement('base');
+                baseNode.target = "_self";
+                document.head.appendChild(baseNode);
+            }
+        });
+    </script>
 """, unsafe_allow_html=True)
 
 # Inicialización obligatoria del historial antes de las pestañas
@@ -115,7 +143,7 @@ if "messages" not in st.session_state:
                 "* Estudiar y repasar conceptos y contenidos temáticos esenciales.\n"
                 "* Guiar el aprendizaje de manera pedagógica y clara.\n\n"
                 "Les invito a utilizar este apoyo con responsabilidad e integridad académica. "
-                "¿Qué tema o consulta académica desean abordar hoy?"
+                "¿Qué tema o consulta académica deseas abordar hoy?"
             )
         }
     ]
