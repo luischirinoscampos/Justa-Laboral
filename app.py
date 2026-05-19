@@ -39,32 +39,36 @@ st.markdown("""
     div[data-testid="stToolbar"] { visibility: hidden; display: none; }
     #MainMenu, footer, [data-testid="stDecoration"] { visibility: hidden; display: none; }
     
-    /* Contenedor centralizado para los títulos según la segunda captura */
+    /* Contenedor centralizado global para los títulos principales */
     .centered-header-block {
         text-align: center;
         width: 100%;
-        padding-top: 10px;
+        margin-top: 10px;
+        margin-bottom: 5px;
     }
     .main-title { 
         font-family: 'Inter', sans-serif; 
         color: #0A2540 !important; 
         font-weight: 700; 
-        margin-bottom: 8px;
         text-align: center;
         font-size: 2.2rem;
+        margin: 0px 0px 5px 0px;
     }
     .sub-caption { 
         font-family: 'Inter', sans-serif; 
         color: #4A5568 !important; 
         font-size: 1rem; 
-        margin-bottom: 25px; 
-        border-bottom: 1px solid #E2E8F0; 
-        padding-bottom: 20px;
         text-align: center;
+        margin: 0px 0px 15px 0px;
+    }
+    .header-divider {
+        border-bottom: 1px solid #E2E8F0;
+        margin-bottom: 20px;
+        width: 100%;
     }
     p, span, li, label, .stMarkdown, h1, h2, h3 { color: #1A202C !important; }
     
-    /* Estructura del input del chat flotante */
+    /* Estructura del input del chat flotante abajo en la raíz */
     [data-testid="stChatInput"] {
         background-color: #FFFFFF !important;
     }
@@ -111,21 +115,24 @@ if "messages" not in st.session_state:
 if "ultimo_envio" not in st.session_state:
     st.session_state.ultimo_envio = 0.0
 
-# 3. ESTRUCTURA DE PESTAÑAS NATIVAS (Alineadas visualmente a la izquierda en Streamlit)
+# =========================================================================
+# ENCABEZADO GLOBAL (Ubicado en la raíz para garantizar centrado absoluto)
+# =========================================================================
+st.markdown("""
+    <div class="centered-header-block">
+        <h1 class="main-title">Aura: Tutora Académica en Línea</h1>
+        <p class="sub-caption">Unidad Curricular: Derecho del Trabajo | Prof: Luis Ignacio Chirinos Campos</p>
+        <div class="header-divider"></div>
+    </div>
+""", unsafe_allow_html=True)
+
+# 3. ESTRUCTURA DE PESTAÑAS NATIVAS
 tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
 
 # ==========================================
-# PESTAÑA 1: EDA (CHAT EN LÍNEA)
+# PESTAÑA 1: EDA (CHAT)
 # ==========================================
 with tab_eda:
-    # Bloque de encabezado perfectamente centrado y libre de iconos
-    st.markdown("""
-        <div class="centered-header-block">
-            <h1 class="main-title">Aura: Tutora Académica en Línea</h1>
-            <p class="sub-caption">Unidad Curricular: Derecho del Trabajo | Prof: Luis Ignacio Chirinos Campos</p>
-        </div>
-    """, unsafe_allow_html=True)
-
     system_instruction = (
         "Eres 'Aura', una tutora académica en línea experta en Derecho del Trabajo para el DCEE de la "
         "Universidad Centroccidental Lisandro Alvarado (UCLA).\n\n"
@@ -148,7 +155,7 @@ with tab_eda:
         with st.chat_message(message["role"], avatar=message.get("avatar")):
             st.markdown(message["content"])
 
-    # Captura del prompt (Ubicado correctamente al final del bloque para asegurar interactividad)
+    # Captura del prompt (Ubicado correctamente al final del bloque de la pestaña)
     prompt = st.chat_input("Escribe tu consulta jurídica aquí...", key="chat_input_eda")
 
     if prompt:
@@ -168,7 +175,7 @@ with tab_eda:
                 st.markdown(prompt)
             st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
 
-            # Generación de la respuesta asistida por el modelo estable de Gemini
+            # Generación de la respuesta asistida por el modelo de Gemini
             with st.chat_message("assistant", avatar="✨"):
                 if not api_key:
                     st.error("Error: No se encontró la configuración de la API Key ('gemini_api_key').")
@@ -178,4 +185,58 @@ with tab_eda:
                         
                         history_contents = []
                         for msg in st.session_state.messages[:-1]:
-                            role
+                            role_mapped = "model" if msg["role"] == "assistant" else "user"
+                            history_contents.append(
+                                types.Content(role=role_mapped, parts=[types.Part.from_text(text=msg["content"])])
+                            )
+                        
+                        config = types.GenerateContentConfig(
+                            system_instruction=system_instruction, 
+                            temperature=0.3
+                        )
+                        
+                        response = client.models.generate_content(
+                            model='gemini-2.5-flash', 
+                            contents=prompt, 
+                            config=config
+                        )
+                        
+                        st.markdown(response.text)
+                        st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": response.text})
+                        
+                        st.rerun()
+                        
+                    except Exception as e:
+                        error_str = str(e)
+                        clean_error = "Se ha agotado la cuota temporal de consultas de la API. El servicio se restablecerá pronto." if "RESOURCE_EXHAUSTED" in error_str else f"Ocurrió un inconveniente: {error_str}"
+                        st.error(clean_error)
+
+# ==========================================
+# PESTAÑA 2: PROFESOR
+# ==========================================
+with tab_profesor:
+    st.subheader("Bitácora de Consultas Locales")
+    clave = st.text_input("Introduzca credencial docente:", type="password", key="docente_password")
+
+    if clave == "UCLA2026":
+        st.success("Acceso Docente Verificado")
+        
+        if os.path.exists(ARCHIVO_BITACORA):
+            try:
+                df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
+                if not df_log.empty:
+                    st.dataframe(df_log.iloc[::-1], use_container_width=True)
+                    
+                    csv_data = df_log.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="📥 Descargar Reporte Completo (CSV)",
+                        data=csv_data,
+                        file_name=f"interacciones_aura_{datetime.now().strftime('%d_%m_%Y')}.csv",
+                        mime="text/csv"
+                    )
+                else:
+                    st.info("El archivo de bitácora está vacío.")
+            except Exception as e:
+                st.error(f"Error al leer la bitácora local: {e}")
+        else:
+            st.info("Aún no se registran interacciones en este servidor.")
