@@ -6,7 +6,7 @@ import pandas as pd
 import os
 import time
 
-# 1. CONFIGURACIÓN DE LA PÁGINA (Debe ser lo primero)
+# 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Aura - Tutora Virtual", page_icon="✨", layout="centered")
 
 # Recuperación de la API Key de Gemini
@@ -28,7 +28,7 @@ def registrar_consulta_local(texto_pregunta):
     except Exception:
         pass
 
-# 2. INYECCIÓN DE ESTILOS CSS (Fondo blanco institucional y limpieza visual)
+# 2. INYECCIÓN DE ESTILOS CSS (Fondo blanco institucional, centrado de textos y limpieza visual)
 st.markdown("""
     <style>
     .stApp, [data-testid="stAppViewContainer"], .stChatMessage {
@@ -39,8 +39,27 @@ st.markdown("""
     div[data-testid="stToolbar"] { visibility: hidden; display: none; }
     #MainMenu, footer, [data-testid="stDecoration"] { visibility: hidden; display: none; }
     
-    .main-title { font-family: 'Inter', sans-serif; color: #0A2540 !important; font-weight: 700; margin-bottom: 5px; }
-    .sub-caption { font-family: 'Inter', sans-serif; color: #4A5568 !important; font-size: 0.95rem; margin-bottom: 25px; border-bottom: 1px solid #E2E8F0; padding-bottom: 15px; }
+    /* Centrado de los bloques de encabezado solicitados */
+    .centered-container {
+        text-align: center;
+        width: 100%;
+    }
+    .main-title { 
+        font-family: 'Inter', sans-serif; 
+        color: #0A2540 !important; 
+        font-weight: 700; 
+        margin-bottom: 5px;
+        text-align: center;
+    }
+    .sub-caption { 
+        font-family: 'Inter', sans-serif; 
+        color: #4A5568 !important; 
+        font-size: 0.95rem; 
+        margin-bottom: 25px; 
+        border-bottom: 1px solid #E2E8F0; 
+        padding-bottom: 15px;
+        text-align: center;
+    }
     p, span, li, label, .stMarkdown, h1, h2, h3 { color: #1A202C !important; }
     
     /* Input del chat flotante abajo en la raíz */
@@ -68,11 +87,11 @@ if "messages" not in st.session_state:
     st.session_state.messages = [
         {
             "role": "assistant",
-            "avatar": "⚖️",
+            "avatar": "✨",
             "content": (
                 "### ¡Bienvenido(a)!\n\n"
-                "Hola. Soy **Aura**, tutora académica virtual del EDA de **Derecho del Trabajo**, "
-                "espacio académico gestionado por Luis Ignacio Chirinos Campos.\n\n"
+                "Hola. Soy **Aura**, tutora académica en línea del EDA de **Derecho del Trabajo**, "
+                "espacio académico gestionado por el Prof: Luis Ignacio Chirinos Campos.\n\n"
                 "Cuento con la preparación para brindarte orientación, guía y acompañamiento en todo lo relacionado "
                 "con el contenido temático de nuestra unidad curricular. Mis respuestas se fundamentan de forma estricta "
                 "en la doctrina jurídica, la normativa laboral vigente y los materiales académicos autorizados.\n\n"
@@ -90,21 +109,22 @@ if "messages" not in st.session_state:
 if "ultimo_envio" not in st.session_state:
     st.session_state.ultimo_envio = 0.0
 
-# 3. CAPTURA DEL INPUT EN LA RAÍZ (Esto obliga a Streamlit a fijarlo abajo del todo)
+# 3. CAPTURA DEL INPUT EN LA RAÍZ (Mantiene el cuadro de entrada al fondo de la pantalla)
 prompt = st.chat_input("Escribe tu consulta jurídica aquí...")
 
-# 4. ESTRUCTURA DE PESTAÑAS
-tab_chat, tab_docente = st.tabs(["💬 Aula Virtual", "🔐 Control Docente"])
+# 4. ESTRUCTURA DE PESTAÑAS (Modificadas por "EDA" y "Profesor")
+tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
 
 # ==========================================
-# PESTAÑA 1: AULA VIRTUAL (CHAT)
+# PESTAÑA 1: EDA (CHAT)
 # ==========================================
-with tab_chat:
-    st.markdown('<h1 class="main-title">⚖️ Justa: Tutora Académica Virtual</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-caption">Asignatura: Derecho del Trabajo | Docencia: Luis Ignacio Chirinos Campos</p>', unsafe_allow_html=True)
+with tab_eda:
+    # Bloque de títulos centrado y sin el icono de la balanza
+    st.markdown('<div class="centered-container"><h1 class="main-title">Aura: Tutora Académica en Línea</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="centered-container"><p class="sub-caption">Unidad Curricular: Derecho del Trabajo | Prof: Luis Ignacio Chirinos Campos</p></div>', unsafe_allow_html=True)
 
     system_instruction = (
-        "Eres 'Justa', una tutora académica experta en Derecho del Trabajo para el DCEE de la "
+        "Eres 'Aura', una tutora académica en línea experta en Derecho del Trabajo para el DCEE de la "
         "Universidad Centroccidental Lisandro Alvarado (UCLA).\n\n"
         "CONTEXTO DE TU DESARROLLO E IDENTIDAD:\n"
         "- Fuiste desarrollada, programada y configurada exclusivamente por el profesor y abogado "
@@ -125,7 +145,7 @@ with tab_chat:
         with st.chat_message(message["role"], avatar=message.get("avatar")):
             st.markdown(message["content"])
 
-    # Si hay una nueva entrada desde el fondo de la pantalla, se procesa aquí adentro
+    # Procesamiento de la entrada de datos si el estudiante realiza una consulta
     if prompt:
         tiempo_actual = time.time()
         tiempo_transcurrido = tiempo_actual - st.session_state.ultimo_envio
@@ -135,9 +155,7 @@ with tab_chat:
             tiempo_espera = int(15.0 - tiempo_transcurrido)
             st.warning(f"⏳ Para garantizar el acceso de todos sus compañeros(as), por favor espere {tiempo_espera} segundos antes de enviar otra consulta.")
         else:
-            # Actualizar la marca de tiempo del último envío válido
             st.session_state.ultimo_envio = tiempo_actual
-            
             registrar_consulta_local(prompt)
             
             # Mostrar el mensaje del estudiante
@@ -145,8 +163,8 @@ with tab_chat:
                 st.markdown(prompt)
             st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
 
-            # Generar respuesta de Justa
-            with st.chat_message("assistant", avatar="⚖️"):
+            # Generar respuesta de Aura
+            with st.chat_message("assistant", avatar="✨"):
                 if not api_key:
                     st.error("Error: No se encontró la configuración de la API Key ('gemini_api_key').")
                 else:
@@ -172,9 +190,8 @@ with tab_chat:
                         )
                         
                         st.markdown(response.text)
-                        st.session_state.messages.append({"role": "assistant", "avatar": "⚖️", "content": response.text})
+                        st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": response.text})
                         
-                        # Forzar recarga limpia para pintar el nuevo mensaje en el orden correcto
                         st.rerun()
                         
                     except Exception as e:
@@ -183,10 +200,11 @@ with tab_chat:
                         st.error(clean_error)
 
 # ==========================================
-# PESTAÑA 2: CONTROL DOCENTE
+# PESTAÑA 2: PROFESOR
 # ==========================================
-with tab_docente:
-    st.markdown('<h2 class="main-title">🔐 Panel de Gestión Académica</h2>', unsafe_allow_html=True)
+with tab_profesor:
+    # Bloque de título centrado para la sección administrativa
+    st.markdown('<div class="centered-container"><h2 class="main-title">🔐 Panel de Gestión Académica</h2></div>', unsafe_allow_html=True)
     clave = st.text_input("Introduzca credencial docente:", type="password", key="docente_password")
 
     if clave == "UCLA2026":
@@ -203,7 +221,7 @@ with tab_docente:
                     st.download_button(
                         label="📥 Descargar Reporte Completo (CSV)",
                         data=csv_data,
-                        file_name=f"interacciones_justa_{datetime.now().strftime('%d_%m_%Y')}.csv",
+                        file_name=f"interacciones_aura_{datetime.now().strftime('%d_%m_%Y')}.csv",
                         mime="text/csv"
                     )
                 else:
