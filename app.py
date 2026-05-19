@@ -93,13 +93,13 @@ if "ultimo_envio" not in st.session_state:
 # 3. CAPTURA DEL INPUT EN LA RAÍZ (Esto obliga a Streamlit a fijarlo abajo del todo)
 prompt = st.chat_input("Escribe tu consulta jurídica aquí...")
 
-# 4. ESTRUCTURA DE PESTAÑAS
-tab_chat, tab_docente = st.tabs(["💬 Aula Virtual", "🔐 Control Docente"])
+# 4. ESTRUCTURA DE PESTAÑAS (Actualizadas a EDA y Profesor)
+tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
 
 # ==========================================
-# PESTAÑA 1: AULA VIRTUAL (CHAT)
+# PESTAÑA 1: EDA (CHAT)
 # ==========================================
-with tab_chat:
+with tab_eda:
     st.markdown('<h1 class="main-title">⚖️ <strong>Aura</strong>: Tutora Académica Virtual</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-caption">Asignatura: Derecho del Trabajo | Docencia: Luis Ignacio Chirinos Campos</p>', unsafe_allow_html=True)
 
@@ -130,85 +130,4 @@ with tab_chat:
         tiempo_actual = time.time()
         tiempo_transcurrido = tiempo_actual - st.session_state.ultimo_envio
         
-        # Restricción obligatoria: 15 segundos entre interacciones por usuario
-        if tiempo_transcurrido < 15.0:
-            tiempo_espera = int(15.0 - tiempo_transcurrido)
-            st.warning(f"⏳ Para garantizar el acceso de todos sus compañeros(as), por favor espere {tiempo_espera} segundos antes de enviar otra consulta.")
-        else:
-            # Actualizar la marca de tiempo del último envío válido
-            st.session_state.ultimo_envio = tiempo_actual
-            
-            registrar_consulta_local(prompt)
-            
-            # Mostrar el mensaje del estudiante
-            with st.chat_message("user", avatar="👤"):
-                st.markdown(prompt)
-            st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
-
-            # Generar respuesta de Aura
-            with st.chat_message("assistant", avatar="⚖️"):
-                if not api_key:
-                    st.error("Error: No se encontró la configuración de la API Key ('gemini_api_key').")
-                else:
-                    try:
-                        client = genai.Client(api_key=api_key)
-                        
-                        history_contents = []
-                        for msg in st.session_state.messages[:-1]:
-                            role_mapped = "model" if msg["role"] == "assistant" else "user"
-                            history_contents.append(
-                                types.Content(role=role_mapped, parts=[types.Part.from_text(text=msg["content"])])
-                            )
-                        
-                        config = types.GenerateContentConfig(
-                            system_instruction=system_instruction, 
-                            temperature=0.3
-                        )
-                        
-                        response = client.models.generate_content(
-                            model='gemini-2.5-flash', 
-                            contents=prompt, 
-                            config=config
-                        )
-                        
-                        st.markdown(response.text)
-                        st.session_state.messages.append({"role": "assistant", "avatar": "⚖️", "content": response.text})
-                        
-                        # Forzar recarga limpia para pintar el nuevo mensaje en el orden correcto
-                        st.rerun()
-                        
-                    except Exception as e:
-                        error_str = str(e)
-                        clean_error = "Se ha agotado la cuota temporal de consultas de la API. El servicio se restablecerá pronto." if "RESOURCE_EXHAUSTED" in error_str else f"Ocurrió un inconveniente: {error_str}"
-                        st.error(clean_error)
-
-# ==========================================
-# PESTAÑA 2: CONTROL DOCENTE
-# ==========================================
-with tab_docente:
-    st.markdown('<h2 class="main-title">🔐 Panel de Gestión Académica</h2>', unsafe_allow_html=True)
-    clave = st.text_input("Introduzca credencial docente:", type="password", key="docente_password")
-
-    if clave == "UCLA2026":
-        st.success("Acceso Docente Verificado")
-        st.subheader("Bitácora de Consultas Locales")
-        
-        if os.path.exists(ARCHIVO_BITACORA):
-            try:
-                df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
-                if not df_log.empty:
-                    st.dataframe(df_log.iloc[::-1], use_container_width=True)
-                    
-                    csv_data = df_log.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label="📥 Descargar Reporte Completo (CSV)",
-                        data=csv_data,
-                        file_name=f"interacciones_aura_{datetime.now().strftime('%d_%m_%Y')}.csv",
-                        mime="text/csv"
-                    )
-                else:
-                    st.info("El archivo de bitácora está vacío.")
-            except Exception as e:
-                st.error(f"Error al leer la bitácora local: {e}")
-        else:
-            st.info("Aún no se registran interacciones en este servidor.")
+        # Restric
