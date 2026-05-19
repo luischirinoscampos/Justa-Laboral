@@ -1,12 +1,3 @@
-El problema por el cual la aplicación no está procesando tus instrucciones se debe a un pequeño detalle técnico que quedó desconectado en el backend cuando cambiamos los nombres de las pestañas en la interfaz gráfica.
-
-En la arquitectura de Streamlit, al renombrar la variable de la primera pestaña de `tab_chat` a `tab_eda`, el bloque que contiene la lógica del chat (`if prompt:`) quedó fuera del flujo de ejecución activa o perdió el orden de renderizado en el servidor. Al presionar ENTER o hacer clic en la flecha, el código registra la entrada en la bitácora pero no logra activar el disparador del modelo de Gemini ni pintar la respuesta.
-
-Además, revisando minuciosamente el código, el botón de descarga del reporte final en la sección del profesor todavía exportaba el archivo con el nombre anterior (`interacciones_justa_...`), por lo que aproveché de unificarlo también.
-
-Aquí tienes el código fuente corregido de manera íntegra, reestructurado pedagógicamente para asegurar que el flujo del chat responda instantáneamente dentro del entorno virtual:
-
-```python
 import streamlit as st
 from google import genai
 from google.genai import types
