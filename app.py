@@ -28,7 +28,7 @@ def registrar_consulta_local(texto_pregunta):
     except Exception:
         pass
 
-# 2. INYECCIÓN DE ESTILOS CSS (Fondo blanco institucional, centrado de textos y limpieza visual)
+# 2. INYECCIÓN DE ESTILOS CSS (Configuración para el centrado total del bloque de texto)
 st.markdown("""
     <style>
     .stApp, [data-testid="stAppViewContainer"], .stChatMessage {
@@ -39,25 +39,27 @@ st.markdown("""
     div[data-testid="stToolbar"] { visibility: hidden; display: none; }
     #MainMenu, footer, [data-testid="stDecoration"] { visibility: hidden; display: none; }
     
-    /* Centrado de los bloques de encabezado solicitados */
-    .centered-container {
+    /* Contenedor centralizado para los títulos según la segunda captura */
+    .centered-header-block {
         text-align: center;
         width: 100%;
+        padding-top: 10px;
     }
     .main-title { 
         font-family: 'Inter', sans-serif; 
         color: #0A2540 !important; 
         font-weight: 700; 
-        margin-bottom: 5px;
+        margin-bottom: 8px;
         text-align: center;
+        font-size: 2.5rem;
     }
     .sub-caption { 
         font-family: 'Inter', sans-serif; 
         color: #4A5568 !important; 
-        font-size: 0.95rem; 
+        font-size: 1.05rem; 
         margin-bottom: 25px; 
         border-bottom: 1px solid #E2E8F0; 
-        padding-bottom: 15px;
+        padding-bottom: 20px;
         text-align: center;
     }
     p, span, li, label, .stMarkdown, h1, h2, h3 { color: #1A202C !important; }
@@ -109,19 +111,23 @@ if "messages" not in st.session_state:
 if "ultimo_envio" not in st.session_state:
     st.session_state.ultimo_envio = 0.0
 
-# 3. CAPTURA DEL INPUT EN LA RAÍZ (Mantiene el cuadro de entrada al fondo de la pantalla)
+# 3. CAPTURA DEL INPUT EN LA RAÍZ
 prompt = st.chat_input("Escribe tu consulta jurídica aquí...")
 
-# 4. ESTRUCTURA DE PESTAÑAS (Modificadas por "EDA" y "Profesor")
+# 4. ESTRUCTURA DE PESTAÑAS (EDA y Profesor)
 tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
 
 # ==========================================
 # PESTAÑA 1: EDA (CHAT)
 # ==========================================
 with tab_eda:
-    # Bloque de títulos centrado y sin el icono de la balanza
-    st.markdown('<div class="centered-container"><h1 class="main-title">Aura: Tutora Académica en Línea</h1></div>', unsafe_allow_html=True)
-    st.markdown('<div class="centered-container"><p class="sub-caption">Unidad Curricular: Derecho del Trabajo | Prof: Luis Ignacio Chirinos Campos</p></div>', unsafe_allow_html=True)
+    # Bloque de encabezado centrado sin la balanza, replicando la estructura de la segunda captura
+    st.markdown("""
+        <div class="centered-header-block">
+            <h1 class="main-title">Aura: Tutora Académica en Línea</h1>
+            <p class="sub-caption">Unidad Curricular: Derecho del Trabajo | Prof: Luis Ignacio Chirinos Campos</p>
+        </div>
+    """, unsafe_allow_html=True)
 
     system_instruction = (
         "Eres 'Aura', una tutora académica en línea experta en Derecho del Trabajo para el DCEE de la "
@@ -204,7 +210,7 @@ with tab_eda:
 # ==========================================
 with tab_profesor:
     # Bloque de título centrado para la sección administrativa
-    st.markdown('<div class="centered-container"><h2 class="main-title">🔐 Panel de Gestión Académica</h2></div>', unsafe_allow_html=True)
+    st.markdown('<div class="centered-header-block"><h2 class="main-title">🔐 Panel de Gestión Académica</h2></div>', unsafe_allow_html=True)
     clave = st.text_input("Introduzca credencial docente:", type="password", key="docente_password")
 
     if clave == "UCLA2026":
