@@ -100,11 +100,11 @@ tab_chat, tab_docente = st.tabs(["💬 Aula Virtual", "🔐 Control Docente"])
 # PESTAÑA 1: AULA VIRTUAL (CHAT)
 # ==========================================
 with tab_chat:
-    st.markdown('<h1 class="main-title">⚖️ **Aura**: Tutora Académica Virtual</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-title">⚖️ <strong>Aura</strong>: Tutora Académica Virtual</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-caption">Asignatura: Derecho del Trabajo | Docencia: Luis Ignacio Chirinos Campos</p>', unsafe_allow_html=True)
 
     system_instruction = (
-        "Eres **Aura**, una tutora académica experta en Derecho del Trabajo para el DCEE de la "
+        "Eres Aura, una tutora académica experta en Derecho del Trabajo para el DCEE de la "
         "Universidad Centroccidental Lisandro Alvarado (UCLA).\n\n"
         "CONTEXTO DE TU DESARROLLO E IDENTIDAD:\n"
         "- Fuiste desarrollada, programada y configurada exclusivamente por el profesor y abogado "
@@ -145,7 +145,7 @@ with tab_chat:
                 st.markdown(prompt)
             st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
 
-            # Generar respuesta de **Aura**
+            # Generar respuesta de Aura
             with st.chat_message("assistant", avatar="⚖️"):
                 if not api_key:
                     st.error("Error: No se encontró la configuración de la API Key ('gemini_api_key').")
