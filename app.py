@@ -6,7 +6,6 @@ import pandas as pd
 import os
 import time
 import json
-import csv
 
 # 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Aura - Tutora Virtual", page_icon="✨", layout="centered")
@@ -19,23 +18,21 @@ ARCHIVO_BITACORA = "consultas_local.csv"
 ARCHIVO_CONOCIMIENTO = "vector_store.json"
 
 def registrar_consulta_local(texto_pregunta, texto_respuesta=""):
-    """
-    Guarda la consulta y la respuesta en un único instante.
-    Usa csv.QUOTE_ALL para asegurar que las comas de la pregunta o respuesta
-    no fracturen las columnas en el archivo físico.
-    """
+    """Guarda la consulta y la respuesta en la bitácora local de forma limpia y automatizada"""
     try:
         ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-        archivo_existe = os.path.exists(ARCHIVO_BITACORA)
+        # Estructura de 3 columnas nativas en un DataFrame unificado
+        nuevo_registro = pd.DataFrame([{
+            "Cuándo": ahora, 
+            "Qué preguntaron": texto_pregunta, 
+            "Respuesta de Aura": texto_respuesta
+        }])
         
-        with open(ARCHIVO_BITACORA, mode='a', encoding='utf-8', newline='') as f:
-            escritor = csv.writer(f, delimiter=',', quoting=csv.QUOTE_ALL)
-            
-            # Si el archivo es nuevo, escribe la cabecera con las 3 columnas fijas
-            if not archivo_existe:
-                escritor.writerow(["Cuándo", "Qué preguntaron", "Respuesta de Aura"])
-            
-            escritor.writerow([ahora, texto_pregunta, texto_respuesta])
+        # Pandas aísla de manera automática cualquier coma interna dentro de los textos
+        if os.path.exists(ARCHIVO_BITACORA):
+            nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='a', header=False, index=False, encoding='utf-8')
+        else:
+            nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='w', header=True, index=False, encoding='utf-8')
     except Exception:
         pass
 
@@ -101,7 +98,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Inicialización obligatoria del historial antes de las pestañas
+# Inicialización del historial de conversación
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {
@@ -218,7 +215,7 @@ DIRECTRICES DE RESPUESTA:
                         st.markdown(response.text)
                         st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": response.text})
                         
-                        # AQUÍ SE REGISTRA: Una sola llamada limpia con ambos datos tras el éxito de la respuesta
+                        # Guardado unificado tras respuesta correcta de la IA
                         registrar_consulta_local(prompt, response.text)
                         st.rerun()
                         
@@ -228,7 +225,7 @@ DIRECTRICES DE RESPUESTA:
                         st.error(clean_error)
                         st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": clean_error})
                         
-                        # AQUÍ SE REGISTRA EL ERROR EXPLICITO: Sin duplicar llamadas ni alterar la estructura
+                        # Guardado unificado en caso de error de conexión
                         registrar_consulta_local(prompt, f"ERROR DE CONEXIÓN: {clean_error}")
                         st.rerun()
 
@@ -244,8 +241,8 @@ with tab_profesor:
         
         if os.path.exists(ARCHIVO_BITACORA):
             try:
-                # Lectura limpia respetando el quoting de strings completo
-                df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8', quoting=csv.QUOTE_ALL, on_bad_lines='skip')
+                # Lectura estándar limpia que respeta el tratamiento de comillas opcionales nativo
+                df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8', on_bad_lines='skip')
                 
                 if not df_log.empty:
                     st.dataframe(df_log.iloc[::-1], use_container_width=True)
