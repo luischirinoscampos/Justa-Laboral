@@ -42,7 +42,7 @@ def registrar_consulta_local(texto_pregunta, texto_respuesta=""):
         pass
 
 # =========================================================================
-# MOTOR DE BÚSQUEDA SEMÁNTICA (RAG LOCAL)
+# MOTOR DE BÚSQUEDA SEMÁNTICA (RAG LOCAL) - OPCIÓN 2
 # =========================================================================
 def limpiar_y_tokenizar(texto):
     """Limpia el texto y lo divide en palabras significativas"""
@@ -151,7 +151,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Inicialización obligatoria del historial antes de las pestañas
+# Inicialización del historial
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {
@@ -177,7 +177,7 @@ if "messages" not in st.session_state:
 if "ultimo_envio" not in st.session_state:
     st.session_state.ultimo_envio = 0.0
 
-# ENCABEZADO SOLICITADO
+# ENCABEZADO
 st.markdown("""
     <div class="custom-header">
         <div class="line-1">Aura</div>
@@ -188,19 +188,16 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# 3. ESTRUCTURA DE PESTAÑAS NATIVAS
 tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
 
 # ==========================================
 # PESTAÑA 1: EDA (CHAT)
 # ==========================================
 with tab_eda:
-    # Renderizar el historial de conversación
     for message in st.session_state.messages:
         with st.chat_message(message["role"], avatar=message.get("avatar")):
             st.markdown(message["content"])
 
-    # Entrada de texto del estudiante
     prompt = st.chat_input("Escribe tu consulta jurídica aquí...", key="chat_input_eda")
 
     if prompt:
@@ -269,7 +266,7 @@ DIRECTRICES DE RESPUESTA:
                         
                         st.markdown(response.text)
                         
-                        # Almacenamiento seguro en la bitácora vinculando ambas partes
+                        # Almacenamiento seguro
                         registrar_consulta_local(prompt, response.text)
                         
                         st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": response.text})
@@ -282,7 +279,7 @@ DIRECTRICES DE RESPUESTA:
                         registrar_consulta_local(prompt, f"ERROR DE CONEXIÓN: {clean_error}")
 
 # ==========================================
-# PESTAÑA 2: PROFESOR
+# PESTAÑA 2: PROFESOR (CON AUTO-REPARACIÓN DE BITÁCORA)
 # ==========================================
 with tab_profesor:
     st.subheader("Bitácora de Consultas Locales")
@@ -292,23 +289,52 @@ with tab_profesor:
         st.success("Acceso Docente Verificado")
         
         if os.path.exists(ARCHIVO_BITACORA):
+            df_log = None
             try:
-                # Se lee el CSV garantizando la correcta decodificación de las celdas de texto
+                # Intento estándar de lectura estructurada de 3 columnas
                 df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
-                if not df_log.empty:
-                    st.dataframe(df_log.iloc[::-1], use_container_width=True)
+            except Exception:
+                # AUTO-REPARACIÓN: Si falla por el choque de columnas viejo/nuevo, se lee línea por línea de forma segura
+                try:
+                    filas_reparadas = []
+                    with open(ARCHIVO_BITACORA, "r", encoding="utf-8") as f:
+                        lineas = f.readlines()
                     
-                    csv_data = df_log.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label="📥 Descargar Reporte Completo (CSV)",
-                        data=csv_data,
-                        file_name=f"interacciones_aura_{datetime.now().strftime('%d_%m_%Y')}.csv",
-                        mime="text/csv"
-                    )
-                else:
-                    st.info("El archivo de bitácora está vacío.")
-            except Exception as e:
-                st.error(f"Error al leer la bitácora local de forma estructurada: {e}")
-                st.info("Nota técnica: Si el archivo previo quedó corrupto por comas sueltas, bórrelo del servidor para que el nuevo sistema lo regenere correctamente desde cero.")
+                    for i, linea in enumerate(lineas):
+                        if i == 0 or not linea.strip():
+                            continue  # Saltar cabecera vieja
+                        
+                        # Limpieza y separación por comas básica controlada
+                        partes = linea.split(",", 2)
+                        cuando = partes[0].strip() if len(partes) > 0 else ""
+                        pregunta = partes[1].strip() if len(partes) > 1 else ""
+                        respuesta = partes[2].strip() if len(partes) > 2 else "No registrada (Bitácora anterior)"
+                        
+                        filas_reparadas.append({
+                            "Cuándo": cuando,
+                            "Qué preguntaron": pregunta,
+                            "Respuesta de Aura": respuesta
+                        })
+                    
+                    # Sobrescribir el archivo dañado con la estructura nueva y limpia
+                    if filas_reparadas:
+                        df_log = pd.DataFrame(filas_reparadas)[["Cuándo", "Qué preguntaron", "Respuesta de Aura"]]
+                        df_log.to_csv(ARCHIVO_BITACORA, index=False, encoding='utf-8')
+                except Exception as e_reparacion:
+                    st.error(f"Error crítico en la auto-reparación: {e_reparacion}")
+
+            # Desplegar la información en pantalla una vez procesada/reparada
+            if df_log is not None and not df_log.empty:
+                st.dataframe(df_log.iloc[::-1], use_container_width=True)
+                
+                csv_data = df_log.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Descargar Reporte Completo (CSV)",
+                    data=csv_data,
+                    file_name=f"interacciones_aura_{datetime.now().strftime('%d_%m_%Y')}.csv",
+                    mime="text/csv"
+                )
+            else:
+                st.info("La bitácora está lista y esperando nuevos registros estructurados.")
         else:
             st.info("Aún no se registran interacciones en este servidor.")
