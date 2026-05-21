@@ -11,13 +11,13 @@ import gspread
 # 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Aura - Tutora Virtual", page_icon="✨", layout="centered")
 
-# Recuperación de credenciales desde los secretos de Streamlit
+# Recuperación de la clave de la API desde los secretos de Streamlit
 api_key = st.secrets.get("gemini_api_key", None)
 
-# RUTAS DE ARCHIVOS LOCALES Y CONFIGURACIÓN DE SHEETS
+# CONFIGURACIÓN DE ALMACENAMIENTO DUAL
 ARCHIVO_BITACORA = "consultas_local.csv"
 ARCHIVO_CONOCIMIENTO = "vector_store.json"
-NOMBRE_HOJA_SHEETS = "Bitacora_Aura"  # Debe coincidir exactamente con el título de su Google Sheets
+NOMBRE_HOJA_SHEETS = "Bitacora_Aura"  # Debe coincidir exactamente con el nombre de su Google Sheets
 
 def conectar_google_sheets():
     """Establece conexión con Google Sheets utilizando las credenciales de los secretos"""
@@ -41,11 +41,14 @@ def conectar_google_sheets():
     except Exception:
         return None
 
-def registrar_consulta_dual(texto_pregunta, respuesta_aura):
-    """Guarda la consulta localmente en el CSV y asíncronamente en Google Sheets"""
+def registrar_consulta_dual(texto_pregunta, respuesta_o_error):
+    """
+    Registra la interacción obligatoriamente en el CSV local y en Google Sheets.
+    Funciona tanto para respuestas exitosas como para reportes de errores de la API.
+    """
     ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
     p_limpia = str(texto_pregunta).replace("\n", " ").replace("\r", " ").replace('"', '""')
-    r_limpia = str(respuesta_aura).replace("\n", " ").replace("\r", " ").replace('"', '""')
+    r_limpia = str(respuesta_o_error).replace("\n", " ").replace("\r", " ").replace('"', '""')
     
     # --- OPERACIÓN 1: ALMACENAMIENTO LOCAL (CSV) ---
     try:
@@ -59,16 +62,16 @@ def registrar_consulta_dual(texto_pregunta, respuesta_aura):
         else:
             nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='w', header=True, index=False, encoding='utf-8')
     except Exception:
-        pass  # Garantiza que fallos en disco no congelen la interfaz
+        pass  # Evita que problemas de escritura en disco congelen la aplicación
 
     # --- OPERACIÓN 2: ALMACENAMIENTO EN LA NUBE (GOOGLE SHEETS) ---
     try:
         hoja = conectar_google_sheets()
         if hoja is not None:
-            # Añade una nueva fila al final de la hoja con los tres datos limpios
+            # Añade de manera segura la fila con los tres datos correspondientes
             hoja.append_row([ahora, p_limpia, r_limpia])
     except Exception:
-        pass  # Si no hay internet o expira la cuota de Google, la app sigue funcionando normalmente
+        pass  # Si falla la conexión a internet, la aplicación continúa de forma fluida
 
 @st.cache_data
 def cargar_contexto_catedra():
@@ -87,7 +90,7 @@ def cargar_contexto_catedra():
 
 CONTEXTO_LEGAL_CATEDRA = cargar_contexto_catedra()
 
-# 2. INYECCIÓN DE ESTILOS CSS
+# 2. INYECCIÓN DE ESTILOS CSS (Fiel a la interfaz limpia de la cátedra)
 st.markdown("""
     <style>
     html, body, [data-testid="stAppViewContainer"] {
@@ -159,7 +162,7 @@ st.markdown("""
 tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
 
 # ==========================================
-# PESTAÑA 1: EDA (CHAT)
+# PESTAÑA 1: EDA (INTERFAZ DE CONSULTAS)
 # ==========================================
 with tab_eda:
     system_instruction = f"""
@@ -198,10 +201,12 @@ FUENTE PRINCIPAL DE CONOCIMIENTO (REPOSITORIO DE LA CÁTEDRA):
 
             with st.chat_message("assistant", avatar="✨"):
                 if not api_key:
-                    st.error("Error: No se encontró la configuración de la API Key.")
-                    registrar_consulta_dual(prompt, "ERROR: Configuración de API Key ausente.")
+                    error_config = "ERROR: Configuración de API Key ausente."
+                    st.error(error_config)
+                    registrar_consulta_dual(prompt, error_config)
                 else:
                     try:
+                        # Intento de comunicación con la API de Gemini
                         client = genai.Client(api_key=api_key)
                         history_contents = []
                         for msg in st.session_state.messages:
@@ -217,22 +222,26 @@ FUENTE PRINCIPAL DE CONOCIMIENTO (REPOSITORIO DE LA CÁTEDRA):
                         st.markdown(respuesta_texto)
                         st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta_texto})
                         
-                        # Doble registro automático
+                        # Guardado exitoso estándar
                         registrar_consulta_dual(prompt, respuesta_texto)
                         st.rerun()
                         
                     except Exception as e:
+                        # CAPTURA DE EXCEPCIONES: Control de errores de cuota o caídas externas
                         error_str = str(e)
-                        if "RESOURCE_EXHAUSTED" in error_str:
-                            clean_error = "Se ha agotado la cuota temporal de consultas de la API."
+                        if "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
+                            clean_error = "ERROR DE CONEXIÓN: Se ha agotado la cuota temporal de consultas de la API."
                         else:
-                            clean_error = f"Ocurrió un inconveniente: {error_str}"
+                            clean_error = f"ERROR DE PROCESAMIENTO: {error_str}"
                         
+                        # Muestra la advertencia limpia en la pantalla del usuario
                         st.error(clean_error)
-                        registrar_consulta_dual(prompt, f"ERROR: {error_str}")
+                        
+                        # SE FUERZA EL REGISTRO: Guarda el incidente tanto en el CSV local como en Google Sheets
+                        registrar_consulta_dual(prompt, clean_error)
 
 # ==========================================
-# PESTAÑA 2: PROFESOR
+# PESTAÑA 2: PROFESOR (MONITORIZACIÓN LOCAL)
 # ==========================================
 with tab_profesor:
     st.subheader("Bitácora de Consultas Locales")
@@ -243,9 +252,11 @@ with tab_profesor:
         
         if os.path.exists(ARCHIVO_BITACORA):
             try:
+                # Lectura defensiva de la bitácora local
                 df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8', on_bad_lines='skip')
                 columnas_requeridas = ["Cuándo", "Qué preguntaron", "Respuesta de Aura"]
                 
+                # Si el archivo está corrupto, se limpia de forma automática
                 if df_log.empty or not all(col in df_log.columns for col in columnas_requeridas):
                     os.remove(ARCHIVO_BITACORA)
                     df_log = pd.DataFrame(columns=columnas_requeridas)
@@ -254,14 +265,14 @@ with tab_profesor:
                     st.dataframe(df_log.iloc[::-1], use_container_width=True)
                     csv_data = df_log.to_csv(index=False).encode('utf-8')
                     st.download_button(
-                        label="📥 Descargar Reporte Local (CSV)",
+                        label="📥 Descargar Reporte Completo (CSV)",
                         data=csv_data,
                         file_name=f"interacciones_aura_{datetime.now().strftime('%d_%m_%Y')}.csv",
                         mime="text/csv"
                     )
                 else:
-                    st.info("Aún no se registran interacciones locales en este servidor.")
+                    st.info("Aún no se registran interacciones en este servidor.")
             except Exception as e:
-                st.error(f"Error al leer la bitácora local: {e}")
+                st.error(f"Error al leer la bitácora local de forma estructurada: {e}")
         else:
-            st.info("Aún no se registran interacciones locales.")
+            st.info("Aún no se registran interacciones en este servidor.")
