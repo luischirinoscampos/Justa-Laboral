@@ -6,6 +6,9 @@ import pandas as pd
 import os
 import time
 import json
+import re
+from collections import Counter
+import math
 
 # 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Aura - Tutora Virtual", page_icon="✨", layout="centered")
@@ -30,35 +33,84 @@ def registrar_consulta_local(texto_pregunta):
     except Exception:
         pass
 
-@st.cache_data
-def cargar_contexto_catedra():
-    """Lee el repositorio estructurado local para inyectarlo en la base de conocimientos de Aura"""
-    if os.path.exists(ARCHIVO_CONOCIMIENTO):
-        try:
-            with open(ARCHIVO_CONOCIMIENTO, "r", encoding="utf-8") as f:
-                datos = json.load(f)
-                contexto_unificado = ""
-                for item in datos:
-                    contexto_unificado += f"\nDocumento: {item['nombre_archivo']}\nContenido: {item['texto_contenido']}\n---"
-                return contexto_unificado
-        except Exception:
+# =========================================================================
+# MOTOR DE BÚSQUEDA SEMÁNTICA (RAG LOCAL) - OPCIÓN 2
+# =========================================================================
+def limpiar_y_tokenizar(texto):
+    """Limpia el texto y lo divide en palabras significativas"""
+    texto = texto.lower()
+    texto = re.sub(r'[^\w\s]', ' ', texto)
+    palabras = texto.split()
+    # Palabras vacías comunes en derecho para filtrar ruido
+    stopwords = {'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'de', 'del', 'en', 'para', 'por', 'con', 'y', 'o', 'que', 'su', 'sus', 'al'}
+    return [p for p in palabras if p not in stopwords and len(p) > 2]
+
+def calcular_similitud_texto(texto1, texto2):
+    """Calcula la similitud de coseno matemática básica entre dos textos"""
+    palabras1 = limpiar_y_tokenizar(texto1)
+    palabras2 = limpiar_y_tokenizar(texto2)
+    
+    if not palabras1 or not palabras2:
+        return 0.0
+        
+    vec1 = Counter(palabras1)
+    vec2 = Counter(palabras2)
+    
+    interseccion = set(vec1.keys()) & set(vec2.keys())
+    numerador = sum([vec1[x] * vec2[x] for x in interseccion])
+    
+    suma1 = sum([vec1[x]**2 for x in vec1.keys()])
+    suma2 = sum([vec2[x]**2 for x in vec2.keys()])
+    denominador = math.sqrt(suma1) * math.sqrt(suma2)
+    
+    if not denominador:
+        return 0.0
+    else:
+        return float(numerador) / denominador
+
+def buscar_contexto_relevante(pregunta_usuario, top_n=3):
+    """Busca y extrae únicamente los fragmentos del JSON que guardan relación con la pregunta"""
+    if not os.path.exists(ARCHIVO_CONOCIMIENTO):
+        return ""
+    
+    try:
+        with open(ARCHIVO_CONOCIMIENTO, "r", encoding="utf-8") as f:
+            datos = json.load(f)
+            
+        puntuaciones = []
+        for item in datos:
+            contenido = item.get('texto_contenido', '')
+            nombre_archivo = item.get('nombre_archivo', 'Documento sin nombre')
+            
+            # Evaluamos la similitud matemática entre la duda y el bloque de texto
+            score = calcular_similitud_texto(pregunta_usuario, contenido)
+            puntuaciones.append((score, nombre_archivo, contenido))
+            
+        # Ordenar de mayor a menor relevancia
+        puntuaciones.sort(key=lambda x: x[0], reverse=True)
+        
+        # Seleccionar solo los mejores N fragmentos
+        fragmentos_seleccionados = [p for p in puntuaciones[:top_n] if p[0] > 0.0]
+        
+        if not fragmentos_seleccionados:
             return ""
-    return ""
+            
+        contexto_filtrado = ""
+        for score, archivo, contenido in fragmentos_seleccionados:
+            contexto_filtrado += f"\nDocumento: {archivo}\nContenido: {contenido}\n---"
+            
+        return contexto_filtrado
+    except Exception:
+        return ""
 
-# Cargar la base de conocimiento en memoria de manera optimizada
-CONTEXTO_LEGAL_CATEDRA = cargar_contexto_catedra()
-
-# 2. INYECCIÓN DE ESTILOS CSS REFORZADOS (Puro CSS, seguro para Streamlit Cloud)
+# 2. INYECCIÓN DE ESTILOS CSS REFORZADOS
 st.markdown("""
     <style>
-    /* Forzar fondo blanco y asegurar el confinamiento en el contenedor del Iframe */
     html, body, [data-testid="stAppViewContainer"] {
         background-color: #FFFFFF !important;
         background: #FFFFFF !important;
         overflow-x: hidden !important;
     }
-    
-    /* Optimización de márgenes para entornos educativos embebidos (Moodle) */
     .block-container {
         padding-top: 1rem !important;
         padding-bottom: 1rem !important;
@@ -66,7 +118,6 @@ st.markdown("""
         padding-right: 1rem !important;
         max-width: 100% !important;
     }
-    
     .stApp, .stChatMessage {
         background-color: #FFFFFF !important;
         background: #FFFFFF !important;
@@ -75,7 +126,6 @@ st.markdown("""
     div[data-testid="stToolbar"] { visibility: hidden; display: none; }
     #MainMenu, footer, [data-testid="stDecoration"] { visibility: hidden; display: none; }
     
-    /* Bloque de diseño de las 4 líneas centradas solicitado */
     .custom-header {
         text-align: center;
         width: 100%;
@@ -83,53 +133,17 @@ st.markdown("""
         margin-bottom: 15px;
         font-family: 'Inter', sans-serif;
     }
-    .line-1 {
-        color: #0A2540 !important;
-        font-size: 2.4rem;
-        font-weight: 700;
-        margin-bottom: 2px;
-    }
-    .line-2 {
-        color: #1A202C !important;
-        font-size: 1.4rem;
-        font-weight: 600;
-        margin-bottom: 6px;
-    }
-    .line-3 {
-        color: #4A5568 !important;
-        font-size: 1.05rem;
-        font-weight: 400;
-        margin-bottom: 4px;
-    }
-    .line-4 {
-        color: #4A5568 !important;
-        font-size: 1.05rem;
-        font-weight: 400;
-        margin-bottom: 12px;
-    }
-    .line-divider {
-        border-bottom: 1px solid #E2E8F0;
-        width: 100%;
-    }
+    .line-1 { color: #0A2540 !important; font-size: 2.4rem; font-weight: 700; margin-bottom: 2px; }
+    .line-2 { color: #1A202C !important; font-size: 1.4rem; font-weight: 600; margin-bottom: 6px; }
+    .line-3 { color: #4A5568 !important; font-size: 1.05rem; font-weight: 400; margin-bottom: 4px; }
+    .line-4 { color: #4A5568 !important; font-size: 1.05rem; font-weight: 400; margin-bottom: 12px; }
+    .line-divider { border-bottom: 1px solid #E2E8F0; width: 100%; }
     p, span, li, label, .stMarkdown, h1, h2, h3 { color: #1A202C !important; }
     
-    /* Input del chat flotante adaptivo */
-    [data-testid="stChatInput"] {
-        background-color: #FFFFFF !important;
-    }
-    [data-testid="stChatInput"] > div {
-        background-color: #F8FAFC !important;
-        border: 1px solid #CBD5E1 !important;
-        border-radius: 8px !important;
-    }
-    [data-testid="stChatInput"] textarea {
-        color: #0A2540 !important;
-        font-family: 'Inter', sans-serif !important;
-    }
-    
-    [data-testid="stChatMessageAvatarCell"] > div {
-        background-color: transparent !important;
-    }
+    [data-testid="stChatInput"] { background-color: #FFFFFF !important; }
+    [data-testid="stChatInput"] > div { background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; border-radius: 8px !important; }
+    [data-testid="stChatInput"] textarea { color: #0A2540 !important; font-family: 'Inter', sans-serif !important; }
+    [data-testid="stChatMessageAvatarCell"] > div { background-color: transparent !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -156,13 +170,10 @@ if "messages" not in st.session_state:
         }
     ]
 
-# Inicialización del control de tiempo
 if "ultimo_envio" not in st.session_state:
     st.session_state.ultimo_envio = 0.0
 
-# =========================================================================
-# ENCABEZADO SOLICITADO (4 LÍNEAS CENTRADAS, SIN COMILLAS, SIN ICONOS)
-# =========================================================================
+# ENCABEZADO SOLICITADO
 st.markdown("""
     <div class="custom-header">
         <div class="line-1">Aura</div>
@@ -180,30 +191,6 @@ tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
 # PESTAÑA 1: EDA (CHAT)
 # ==========================================
 with tab_eda:
-    system_instruction = f"""
-Eres Aura, una tutora académica en línea experta en Derecho del Trabajo para el DCEE de la Universidad Centroccidental Lisandro Alvarado (UCLA).
-Tu comunicación debe caracterizarse por una claridad respetuosa y una honestidad total.
-
-CONTEXTO DE TU DESARROLLO E IDENTIDAD:
-- Fuiste desarrollada, programada y configurada exclusivamente por el profesor y abogado Luis Ignacio Chirinos Campos, quien es tu creador y el docente ordinario de esta asignatura.
-- Si alguien te pregunta por tu origen, creador, desarrollador o profesor de la materia, debes reconocer con orgullo, respeto y claridad institucional que eres una creación tecnológica del profesor Luis Ignacio Chirinos Campos para el beneficio académico del estudiantado, y perteneces al ecosistema digital de aprendizaje de la unidad curricular.
-
-PAUTAS DE COMPORTAMIENTO Y PEDAGOGÍA:
-- Tu propósito es guiar a quienes estudian de forma pedagógica, rigurosa aunque amable, clara, cálida y cercana.
-- Utiliza siempre un lenguaje neutral, inclusivo y formal, adecuado para el ámbito de la educación universitaria virtual o a distancia.
-- Evita respuestas genéricas de asistente virtual de internet. Eres una herramienta académica del Ecosistema Digital de Aprendizaje (EDA).
-
-FUENTE PRINCIPAL DE CONOCIMIENTO (REPOSITORIO DE LA CÁTEDRA):
-Utiliza de forma obligatoria y prioritaria el siguiente contenido extraído de las guías, ejercicios resueltos, Constitución y leyes cargadas por el docente para estructurar tus respuestas:
-=========================================
-{CONTEXTO_LEGAL_CATEDRA}
-=========================================
-
-DIRECTRICES DE RESPUESTA:
-1. Responde basándote estrictamente en la doctrina jurídica laboral, la normativa legal venezolana vigente (CRBV, LOTTT) y el repositorio de la cátedra suministrado arriba. Citando las fuentes de forma precisa cuando corresponda.
-2. Si la respuesta a la duda o planteamiento del estudiante no se encuentra en el repositorio proporcionado ni se relaciona directamente con los objetivos académicos de la asignatura, indícalo abiertamente con honestidad académica y reorienta la conversación hacia los temas de estudio laboral.
-"""
-
     # Renderizar el historial de conversación
     for message in st.session_state.messages:
         with st.chat_message(message["role"], avatar=message.get("avatar")):
@@ -234,7 +221,35 @@ DIRECTRICES DE RESPUESTA:
                     try:
                         client = genai.Client(api_key=api_key)
                         
-                        # Construir el historial completo para mantener el hilo de la conversación
+                        # PASO CLAVE: Buscar dinámicamente solo el contexto relevante para ESTE prompt específico
+                        contexto_acotado = buscar_contexto_relevante(prompt, top_n=3)
+                        
+                        # Construcción de la instrucción del sistema dinámica y optimizada
+                        system_instruction = f"""
+Eres Aura, una tutora académica en línea experta en Derecho del Trabajo para el DCEE de la Universidad Centroccidental Lisandro Alvarado (UCLA).
+Tu comunicación debe caracterizarse por una claridad respetuosa y una honestidad total.
+
+CONTEXTO DE TU DESARROLLO E IDENTIDAD:
+- Fuiste desarrollada, programada y configurada exclusivamente por el profesor y abogado Luis Ignacio Chirinos Campos, quien es tu creador y el docente ordinario de esta asignatura.
+- Si alguien te pregunta por tu origen, creador, desarrollador o profesor de la materia, debes reconocer con orgullo, respeto y claridad institucional que eres una creación tecnológica del profesor Luis Ignacio Chirinos Campos para el beneficio académico del estudiantado, y perteneces al ecosistema digital de aprendizaje de la unidad curricular.
+
+PAUTAS DE COMPORTAMIENTO Y PEDAGOGÍA:
+- Tu propósito es guiar a quienes estudian de forma pedagógica, rigurosa aunque amable, clara, cálida y cercana.
+- Utiliza siempre un lenguaje neutral, inclusivo y formal, adecuado para el ámbito de la educación universitaria virtual o a distancia.
+- Evita respuestas genéricas de asistente virtual de internet. Eres una herramienta académica del Ecosistema Digital de Aprendizaje (EDA).
+
+FUENTE PRINCIPAL DE CONOCIMIENTO (REPOSITORIO ESPECÍFICO EXTRACTADO):
+Utiliza de forma obligatoria y prioritaria el siguiente contenido específico seleccionado por relevancia para estructurar tu respuesta:
+=========================================
+{contexto_acotado}
+=========================================
+
+DIRECTRICES DE RESPUESTA:
+1. Responde basándote estrictamente en la doctrina jurídica laboral, la normativa legal venezolana vigente (CRBV, LOTTT) y el repositorio acotado suministrado arriba. Citando las fuentes de forma precisa cuando corresponda.
+2. Si el fragmento proporcionado arriba no contiene la solución y la duda no se relaciona con los objetivos académicos de la asignatura, indícalo abiertamente con honestidad académica y reorienta la conversación hacia los temas de estudio laboral.
+"""
+                        
+                        # Construir el historial de conversación para la API
                         history_contents = []
                         for msg in st.session_state.messages:
                             role_mapped = "model" if msg["role"] == "assistant" else "user"
