@@ -18,17 +18,18 @@ ARCHIVO_BITACORA = "consultas_local.csv"
 ARCHIVO_CONOCIMIENTO = "vector_store.json"
 
 def registrar_consulta_local(texto_pregunta, respuesta_aura):
-    """Guarda la consulta en un archivo CSV local con estructura estricta de dos columnas"""
+    """Guarda la consulta en un archivo CSV local con una estructura estricta de 3 columnas"""
     try:
         ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
         # Se eliminan saltos de línea y retornos para evitar que rompan las filas del CSV
-        p_limpia = str(texto_pregunta).replace("\n", " ").replace("\r", " ")
-        r_limpia = str(respuesta_aura).replace("\n", " ").replace("\r", " ")
+        p_limpia = str(texto_pregunta).replace("\n", " ").replace("\r", " ").replace('"', '""')
+        r_limpia = str(respuesta_aura).replace("\n", " ").replace("\r", " ").replace('"', '""')
         
-        # Integración de la pregunta y la respuesta en una sola cadena de texto
-        detalle_integrado = f"PREGUNTA: {p_limpia} | RESPUESTA DE AURA: {r_limpia}"
-        
-        nuevo_registro = pd.DataFrame([{"Cuándo": ahora, "Detalle de la Consulta": detalle_integrated}])
+        nuevo_registro = pd.DataFrame([{
+            "Cuándo": ahora, 
+            "Qué preguntaron": f'"{p_limpia}"', 
+            "Respuesta de Aura": f'"{r_limpia}"'
+        }])
         
         if os.path.exists(ARCHIVO_BITACORA):
             nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='a', header=False, index=False, encoding='utf-8')
@@ -192,7 +193,7 @@ CONTEXTO DE TU DESARROLLO E IDENTIDAD:
 - Si alguien te pregunta por tu origen, creador, desarrollador o profesor de la materia, debes reconocer con orgullo, respeto y claridad institucional que eres una creación tecnológica del profesor Luis Ignacio Chirinos Campos para el beneficio académico del estudiantado, y perteneces al ecosistema digital de aprendizaje de la unidad curricular.
 
 PAUTAS DE COMPORTAMIENTO Y PEDAGOGÍA:
-- Tu propósito es guiar a quienes estudian de forma pedagógica, rigurosa aunque amable, clara, cálida y cercana.
+- Tu propósito es guiar a quienes estudiar de forma pedagógica, rigurosa aunque amable, clara, cálida y cercana.
 - Utiliza siempre un lenguaje neutral, inclusivo y formal, adecuado para el ámbito de la educación universitaria virtual o a distancia.
 - Evita respuestas genéricas de asistente virtual de internet. Eres una herramienta académica del Ecosistema Digital de Aprendizaje (EDA).
 
@@ -259,7 +260,7 @@ DIRECTRICES DE RESPUESTA:
                         st.markdown(respuesta_texto)
                         st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta_texto})
                         
-                        # Guardado exitoso estándar
+                        # Guardado estándar de tres columnas
                         registrar_consulta_local(prompt, respuesta_texto)
                         st.rerun()
                         
@@ -267,11 +268,10 @@ DIRECTRICES DE RESPUESTA:
                         error_str = str(e)
                         if "RESOURCE_EXHAUSTED" in error_str:
                             clean_error = "Se ha agotado la cuota temporal de consultas de la API. El servicio se restablecerá pronto."
-                            # Forzar el registro local detallando la caída por cuota
-                            registrar_consulta_local(prompt, "FALLO DE SISTEMA: Cuota temporal de API excedida.")
+                            registrar_consulta_local(prompt, "ERROR DE CONEXIÓN: Se ha agotado la cuota temporal de consultas de la API.")
                         else:
                             clean_error = f"Ocurrió un inconveniente: {error_str}"
-                            registrar_consulta_local(prompt, f"FALLO DE SISTEMA: {error_str}")
+                            registrar_consulta_local(prompt, f"ERROR DE CONEXIÓN: {error_str}")
                         
                         st.error(clean_error)
 
@@ -287,18 +287,20 @@ with tab_profesor:
         
         if os.path.exists(ARCHIVO_BITACORA):
             try:
-                df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
+                # Lectura robusta: si hay líneas inconsistentes debido a errores previos, pandas las ignora en lugar de lanzar una excepción C
+                df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8', on_bad_lines='skip')
                 
-                # CONTROL DE COMPATIBILIDAD: Si el archivo cargado no tiene la columna nueva, se limpia para evitar fallos de índice
-                if not df_log.empty and "Detalle de la Consulta" not in df_log.columns:
+                # Verificación estricta de estructura requerida
+                columnas_requeridas = ["Cuándo", "Qué preguntaron", "Respuesta de Aura"]
+                if df_log.empty or not all(col in df_log.columns for col in columnas_requeridas):
+                    # Si el archivo está corrupto o mantiene la estructura vieja de 2 columnas, se limpia para regenerarlo correctamente
                     os.remove(ARCHIVO_BITACORA)
-                    df_log = pd.DataFrame(columns=["Cuándo", "Detalle de la Consulta"])
+                    df_log = pd.DataFrame(columns=columnas_requeridas)
                 
                 if not df_log.empty:
-                    df_render = df_log[["Cuándo", "Detalle de la Consulta"]]
-                    st.dataframe(df_render.iloc[::-1], use_container_width=True)
+                    st.dataframe(df_log.iloc[::-1], use_container_width=True)
                     
-                    csv_data = df_render.to_csv(index=False).encode('utf-8')
+                    csv_data = df_log.to_csv(index=False).encode('utf-8')
                     st.download_button(
                         label="📥 Descargar Reporte Completo (CSV)",
                         data=csv_data,
@@ -306,8 +308,8 @@ with tab_profesor:
                         mime="text/csv"
                     )
                 else:
-                    st.info("El archivo de bitácora está vacío o se ha restablecido para actualizar el formato.")
+                    st.info("Aún no se registran interacciones en este servidor.")
             except Exception as e:
-                st.error(f"Error al procesar la bitácora estructurada: {e}")
+                st.error(f"Error al leer la bitácora local de forma estructurada: {e}")
         else:
             st.info("Aún no se registran interacciones en este servidor.")
