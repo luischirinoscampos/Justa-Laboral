@@ -150,6 +150,7 @@ st.markdown("""
         border-radius: 12px !important;
     }
     
+    /* Estilo para el botón de la izquierda */
     div[data-testid="column"]:first-child .stButton button {
         background-color: transparent !important;
         color: #4A5568 !important;
@@ -165,6 +166,7 @@ st.markdown("""
         border-color: #0A2540 !important;
     }
     
+    /* Estilo para el botón de la derecha */
     div[data-testid="column"]:last-child .stButton button {
         background-color: transparent !important;
         color: #4A5568 !important;
@@ -173,6 +175,7 @@ st.markdown("""
         border: 1px solid #CBD5E1 !important;
         border-radius: 8px !important;
         box-shadow: none !important;
+        float: right !important;
     }
     div[data-testid="column"]:last-child .stButton button:hover {
         color: #0A2540 !important;
@@ -223,18 +226,16 @@ if "profesor_autenticado" not in st.session_state:
     st.session_state.profesor_autenticado = False
 
 # ==========================================
-# 9. BOTONES SUPERIORES
+# 9. BOTONES SUPERIORES (EN EXTREMOS)
 # ==========================================
-col_izq, col_espacio, col_der = st.columns([1, 10, 1])
+col_izq, col_der = st.columns([1, 20])
 
 with col_izq:
     if st.button("🔒", key="btn_profesor", help="Acceso profesor"):
         if st.session_state.modo_profesor:
-            # Si ya está en modo profesor, cerrar sesión
             st.session_state.modo_profesor = False
             st.session_state.profesor_autenticado = False
         else:
-            # Activar modo profesor (oculta el chat)
             st.session_state.modo_profesor = True
             st.session_state.profesor_autenticado = False
         st.rerun()
@@ -250,7 +251,6 @@ st.markdown("<br>", unsafe_allow_html=True)
 # 10. MODO NORMAL (CHAT VISIBLE)
 # ==========================================
 if not st.session_state.modo_profesor:
-    # Mostrar historial de mensajes
     for message in st.session_state.messages:
         with st.chat_message(message["role"], avatar=message.get("avatar")):
             st.markdown(message["content"])
@@ -380,7 +380,6 @@ else:
     st.markdown("## 📋 Panel del Profesor")
     
     if not st.session_state.profesor_autenticado:
-        # Solicitar credenciales
         st.markdown("### 🔐 Acceso restringido")
         clave = st.text_input("Ingrese la credencial docente:", type="password", key="profesor_clave")
         if clave:
@@ -391,24 +390,20 @@ else:
             else:
                 st.error("❌ Credencial incorrecta. Acceso denegado.")
         
-        # Botón para volver al chat sin autenticarse
         if st.button("← Volver al chat", key="volver_chat"):
             st.session_state.modo_profesor = False
             st.session_state.profesor_autenticado = False
             st.rerun()
     
     else:
-        # Mostrar métricas
         st.markdown("### 📊 Bitácora de Consultas")
         
         if os.path.exists(ARCHIVO_BITACORA):
             try:
                 df = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
                 if not df.empty:
-                    # Mostrar tabla completa (más reciente primero)
                     st.dataframe(df.iloc[::-1], use_container_width=True)
                     
-                    # Botón de descarga
                     csv_data = df.to_csv(index=False).encode('utf-8')
                     st.download_button(
                         label="📥 Descargar bitácora (CSV)",
@@ -417,7 +412,6 @@ else:
                         mime="text/csv"
                     )
                     
-                    # Estadísticas
                     st.markdown("---")
                     st.markdown("### 📈 Estadísticas")
                     col1, col2 = st.columns(2)
@@ -427,20 +421,17 @@ else:
                         bloqueos = df[df["Respuesta de Aura"].str.contains("BLOQUEADO", na=False)].shape[0] if "Respuesta de Aura" in df.columns else 0
                         st.metric("Intentos bloqueados", bloqueos)
                     
-                    # Últimas 5 consultas
                     st.markdown("---")
                     st.markdown("### 🕐 Últimas 5 consultas")
                     st.dataframe(df.tail(5), use_container_width=True)
                     
                 else:
-                    st.info("📭 La bitácora está vacía. Realiza una consulta de prueba para comenzar a registrar.")
+                    st.info("📭 La bitácora está vacía.")
             except Exception as e:
                 st.error(f"Error al leer la bitácora: {e}")
         else:
             st.warning("📭 Aún no hay registros en la bitácora.")
-            st.info("💡 Realiza una consulta de prueba desde el chat para crear el archivo de bitácora.")
         
-        # Botón para cerrar sesión y volver al chat
         st.markdown("---")
         if st.button("🔒 Cerrar sesión y volver al chat", key="cerrar_sesion"):
             st.session_state.modo_profesor = False
