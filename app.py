@@ -8,8 +8,6 @@ import time
 import json
 import hashlib
 import re
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 
 # ==========================================
 # 1. CONFIGURACIÓN INICIAL
@@ -20,7 +18,6 @@ api_key = st.secrets.get("gemini_api_key", None)
 
 ARCHIVO_BITACORA = "consultas_local.csv"
 ARCHIVO_CONOCIMIENTO = "vector_store.json"
-NOMBRE_HOJA_SHEETS = "Bitacora_Aura"
 
 # ==========================================
 # 2. FUNCIÓN PARA REINICIAR CONVERSACIÓN
@@ -85,58 +82,29 @@ def cargar_contexto_catedra():
 CONTEXTO_BASE = cargar_contexto_catedra()
 
 # ==========================================
-# 5. FUNCIONES DE REGISTRO
+# 5. REGISTRO EN CSV LOCAL (único almacén)
 # ==========================================
-def conectar_google_sheets():
-    try:
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        private_key = st.secrets["gspread"]["private_key"]
-        if "\\n" in private_key:
-            private_key = private_key.replace("\\n", "\n")
-            
-        credenciales_dict = {
-            "type": st.secrets["gspread"]["type"],
-            "project_id": st.secrets["gspread"]["project_id"],
-            "private_key_id": st.secrets["gspread"]["private_key_id"],
-            "private_key": private_key,
-            "client_email": st.secrets["gspread"]["client_email"],
-            "client_id": st.secrets["gspread"]["client_id"],
-            "auth_uri": st.secrets["gspread"]["auth_uri"],
-            "token_uri": st.secrets["gspread"]["token_uri"],
-            "auth_provider_x509_cert_url": st.secrets["gspread"]["auth_provider_x509_cert_url"],
-            "client_x509_cert_url": st.secrets["gspread"]["client_x509_cert_url"]
-        }
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(credenciales_dict, scope)
-        gc = gspread.authorize(creds)
-        sh = gc.open(NOMBRE_HOJA_SHEETS)
-        return sh.sheet1
-    except Exception:
-        return None
-
-@st.cache_resource
-def get_sheets_client():
-    return conectar_google_sheets()
-
-def registrar_consulta_dual(texto_pregunta, respuesta_o_error):
+def registrar_consulta(pregunta: str, respuesta: str):
+    """Registra la consulta en el archivo CSV local"""
     ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-    p_limpia = str(texto_pregunta).replace("\n", " ").replace("\r", " ").strip()
-    r_limpia = str(respuesta_o_error).replace("\n", " ").replace("\r", " ").strip()
+    
+    # Limpiar textos para evitar problemas con comas y saltos de línea
+    pregunta_limpia = str(pregunta).replace("\n", " ").replace("\r", " ").replace(",", " ").strip()
+    respuesta_limpia = str(respuesta).replace("\n", " ").replace("\r", " ").replace(",", " ").strip()
+    
+    nuevo_registro = pd.DataFrame([{
+        "Cuándo": ahora,
+        "Qué preguntó": pregunta_limpia,
+        "Respuesta de Aura": respuesta_limpia
+    }])
     
     try:
-        nuevo_registro = pd.DataFrame([{"Cuándo": ahora, "Qué preguntaron": p_limpia, "Respuesta de Aura": r_limpia}])
         if os.path.exists(ARCHIVO_BITACORA):
             nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='a', header=False, index=False, encoding='utf-8')
         else:
             nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='w', header=True, index=False, encoding='utf-8')
-    except Exception:
-        pass
-    
-    try:
-        hoja = get_sheets_client()
-        if hoja:
-            hoja.append_row([ahora, p_limpia, r_limpia])
-    except Exception:
-        pass
+    except Exception as e:
+        st.error(f"Error al guardar en bitácora: {e}")
 
 # ==========================================
 # 6. ESTILOS CSS
@@ -275,12 +243,12 @@ with col_der:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ==========================================
-# 10. PANEL DEL PROFESOR
+# 10. PANEL DEL PROFESOR (solo CSV local)
 # ==========================================
 if st.session_state.show_profesor:
     with st.container():
         st.markdown("---")
-        st.markdown("### 📋 Panel del Profesor")
+        st.markdown("### 📋 Panel del Profesor - Bitácora de Consultas")
         
         if not st.session_state.profesor_autenticado:
             clave = st.text_input("Credencial docente:", type="password", key="profesor_clave")
@@ -292,36 +260,61 @@ if st.session_state.show_profesor:
                 else:
                     st.error("❌ Credencial incorrecta")
         else:
-            st.success("✅ Sesión activa")
+            st.success("✅ Sesión activa - Bitácora disponible")
             
+            # Verificar si existe el archivo de bitácora
             if os.path.exists(ARCHIVO_BITACORA):
                 try:
                     df = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
+                    
                     if not df.empty:
+                        # Mostrar la bitácora completa (más reciente primero)
+                        st.subheader("📋 Registro completo de consultas")
                         st.dataframe(df.iloc[::-1], use_container_width=True)
+                        
+                        # Botón de descarga
                         csv_data = df.to_csv(index=False).encode('utf-8')
                         st.download_button(
-                            label="📥 Descargar CSV",
+                            label="📥 Descargar bitácora (CSV)",
                             data=csv_data,
-                            file_name=f"aura_bitacora_{datetime.now().strftime('%d_%m_%Y')}.csv",
+                            file_name=f"aura_bitacora_{datetime.now().strftime('%d_%m_%Y_%H%M')}.csv",
                             mime="text/csv"
                         )
                         
+                        # Estadísticas
                         st.markdown("---")
                         st.subheader("📊 Estadísticas")
-                        st.metric("Total de consultas", len(df))
-                        if "Respuesta de Aura" in df.columns:
-                            bloqueos = df[df["Respuesta de Aura"].str.contains("BLOQUEADO", na=False)].shape[0]
-                            if bloqueos > 0:
-                                st.warning(f"🚨 Intentos bloqueados: {bloqueos}")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.metric("Total de consultas", len(df))
+                        with col2:
+                            if "Respuesta de Aura" in df.columns:
+                                bloqueos = df[df["Respuesta de Aura"].str.contains("BLOQUEADO", na=False)].shape[0]
+                                st.metric("Intentos bloqueados", bloqueos)
+                        
+                        # Últimas 5 consultas
+                        st.markdown("---")
+                        st.subheader("🕐 Últimas 5 consultas")
+                        st.dataframe(df.tail(5), use_container_width=True)
+                        
                     else:
-                        st.info("No hay registros aún.")
+                        st.info("📭 La bitácora está vacía. Realiza una consulta de prueba para comenzar a registrar.")
                 except Exception as e:
-                    st.error(f"Error al leer bitácora: {e}")
+                    st.error(f"Error al leer la bitácora: {e}")
+                    st.info("💡 Puede deberse a un formato incorrecto. Realiza una nueva consulta para regenerar el archivo.")
             else:
-                st.info("No hay registros aún.")
+                st.warning("📭 Aún no hay registros en la bitácora.")
+                st.info("💡 Realiza una consulta de prueba desde el chat para crear el archivo de bitácora.")
+                
+                # Botón para forzar creación del archivo
+                if st.button("📝 Crear archivo de bitácora"):
+                    registrar_consulta("Prueba de inicialización", "Bitácora creada correctamente")
+                    st.success("✅ Archivo de bitácora creado. Realiza una consulta real para comenzar a registrar.")
+                    st.rerun()
             
-            if st.button("🔒 Cerrar panel"):
+            # Botón para cerrar panel
+            st.markdown("---")
+            if st.button("🔒 Cerrar panel", key="cerrar_panel"):
                 st.session_state.show_profesor = False
                 st.session_state.profesor_autenticado = False
                 st.rerun()
@@ -331,61 +324,48 @@ if st.session_state.show_profesor:
 # ==========================================
 PALABRAS_EVALUACION = [
     "examen", "evaluación", "prueba", "cuestionario", "respuesta del examen",
-    "dame la respuesta", "cuál es la opción", "qué pongo", "respuesta correcta"
+    "dame la respuesta", "cuál es la opción", "qué pongo", "respuesta correcta",
+    "pregunta del parcial", "quiz", "test", "calificación", "nota", "aprobar"
 ]
 
 def es_intento_evaluacion(pregunta: str) -> bool:
-    return any(palabra in pregunta.lower() for palabra in PALABRAS_EVALUACION)
+    pregunta_lower = pregunta.lower()
+    return any(palabra in pregunta_lower for palabra in PALABRAS_EVALUACION)
 
 # ==========================================
 # 12. LÓGICA DINÁMICA DE TOKENS
 # ==========================================
 def calcular_max_tokens(pregunta: str) -> int:
-    """
-    Calcula dinámicamente el límite de tokens de salida según la complejidad de la pregunta.
-    """
     pregunta_lower = pregunta.lower()
     
-    # Palabras que indican que la pregunta requiere respuesta larga
     palabras_complejas = [
         "salario", "prestaciones", "contrato", "despido", "indemnización",
         "vacaciones", "utilidades", "liquidación", "beneficios", "artículo",
         "explique", "compare", "diferencia", "procedimiento", "cálculo",
-        "cómo se", "cuál es", "derechos", "obligaciones", "LOTTT", "reglamento"
+        "cómo se", "cuál es", "derechos", "obligaciones", "LOTTT"
     ]
     
-    # Palabras que indican respuesta corta
     palabras_cortas = [
-        "qué es", "defina", "significa", "qué significa", "concepto",
-        "brevemente", "resumido", "en una línea", "sí o no", "verdadero", "falso"
+        "qué es", "defina", "significa", "brevemente", "resumido", "sí o no"
     ]
     
-    # Bonus por longitud de la pregunta
-    longitud = len(pregunta)
-    
-    # Calcular puntuación
     puntuacion = 0
-    
     for palabra in palabras_complejas:
         if palabra in pregunta_lower:
             puntuacion += 2
-    
     for palabra in palabras_cortas:
         if palabra in pregunta_lower:
-            puntuacion -= 3
+            puntuacion -= 2
     
-    if longitud > 100:
-        puntuacion += 1
-    if longitud > 200:
+    if len(pregunta) > 150:
         puntuacion += 1
     
-    # Decisión basada en puntuación
-    if puntuacion >= 3:
-        return 4096  # Máximo para respuestas complejas
-    elif puntuacion <= -2:
-        return 1024  # Mínimo para respuestas muy cortas
+    if puntuacion >= 2:
+        return 4096
+    elif puntuacion <= -1:
+        return 1024
     else:
-        return 2048  # Intermedio para respuestas normales
+        return 2048
 
 # ==========================================
 # 13. SYSTEM INSTRUCTION
@@ -402,7 +382,6 @@ REGLAS:
 - Usa **negritas** para conceptos clave.
 - NO ayudas a resolver exámenes o evaluaciones.
 - Cita las fuentes del contexto cuando las uses.
-- Sé concisa pero completa. Si la pregunta requiere explicación detallada, desarróllala.
 """
 
 # ==========================================
@@ -426,52 +405,50 @@ if prompt:
         st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
         
         with st.chat_message("assistant", avatar="✨"):
-            # Bloqueo de evaluaciones
+            # === BLOQUEO DE EVALUACIONES ===
             if es_intento_evaluacion(prompt):
-                respuesta = "📚 **Lo siento, no puedo ayudarte con evaluaciones.** Estoy para apoyar tu aprendizaje genuino. ¿Tienes alguna duda sobre el contenido?"
-                st.markdown(respuesta)
-                st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta})
-                registrar_consulta_dual(prompt, "[BLOQUEADO]")
+                respuesta_bloqueo = (
+                    "📚 **Lo siento, no puedo ayudarte con eso.**\n\n"
+                    "Mis funciones como Aura están diseñadas exclusivamente para acompañar tu proceso de **aprendizaje**, "
+                    "no para resolver evaluaciones. El Prof. Luis Ignacio Chirinos Campos me ha instruido para proteger "
+                    "la integridad académica del EDA.\n\n"
+                    "✨ Te invito a estudiar el material de la unidad y formularme una duda genuina sobre el contenido."
+                )
+                st.markdown(respuesta_bloqueo)
+                st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta_bloqueo})
+                registrar_consulta(prompt, "[BLOQUEADO] Intento de evaluación")
                 st.stop()
             
-            # Verificar caché
+            # === VERIFICAR CACHÉ ===
             cache = obtener_cache(prompt)
             if cache:
                 st.markdown(cache)
                 st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": cache})
-                registrar_consulta_dual(prompt, "[CACHÉ]")
-                st.info("⚡ Respuesta recuperada de memoria")
+                registrar_consulta(prompt, "[RESPUESTA DESDE CACHÉ]")
+                st.info("⚡ Respuesta recuperada de memoria (consulta previa idéntica)")
                 st.rerun()
             
-            # Llamar a Gemini
+            # === LLAMAR A GEMINI ===
             if not api_key:
-                st.error("Error: API Key no configurada.")
+                error_msg = "❌ Error: Configuración de API ausente. Contacta al profesor."
+                st.error(error_msg)
+                registrar_consulta(prompt, error_msg)
             else:
                 try:
                     client = genai.Client(api_key=api_key)
+                    
+                    # Historial limitado a últimos 4 mensajes
                     history = []
                     for msg in st.session_state.messages[-4:]:
                         role = "model" if msg["role"] == "assistant" else "user"
                         history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
                     
-                    # Calcular tokens dinámicamente según la pregunta
                     max_tokens = calcular_max_tokens(prompt)
-                    
-                    # Mostrar indicador de modo (opcional, para transparencia)
-                    if max_tokens == 4096:
-                        modo = "📖 Modo detallado"
-                    elif max_tokens == 1024:
-                        modo = "📝 Modo conciso"
-                    else:
-                        modo = "📘 Modo estándar"
-                    
-                    # Opcional: mostrar el modo (comentar si no quieres que el estudiante lo vea)
-                    # st.caption(modo)
                     
                     config = types.GenerateContentConfig(
                         system_instruction=get_system_instruction(),
                         temperature=0.2,
-                        max_output_tokens=max_tokens  # ← VALOR DINÁMICO
+                        max_output_tokens=max_tokens
                     )
                     
                     response = client.models.generate_content(
@@ -483,8 +460,10 @@ if prompt:
                     respuesta_texto = response.text
                     st.markdown(respuesta_texto)
                     st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta_texto})
+                    
+                    # Guardar en caché y bitácora
                     guardar_cache(prompt, respuesta_texto)
-                    registrar_consulta_dual(prompt, respuesta_texto)
+                    registrar_consulta(prompt, respuesta_texto)
                     
                 except Exception as e:
                     error_str = str(e)
@@ -496,4 +475,4 @@ if prompt:
                         clean_error = f"⚠️ Error técnico: {error_str[:150]}"
                     
                     st.error(clean_error)
-                    registrar_consulta_dual(prompt, clean_error)
+                    registrar_consulta(prompt, clean_error)
