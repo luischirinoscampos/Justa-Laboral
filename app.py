@@ -20,11 +20,15 @@ api_key = st.secrets.get("gemini_api_key", None)
 ARCHIVO_BITACORA = "consultas_local.csv"
 ARCHIVO_CONOCIMIENTO = "vector_store.json"
 
-def registrar_consulta_local(texto_pregunta):
-    """Guarda la consulta de inmediato en un archivo CSV local"""
+def registrar_consulta_local(texto_pregunta, texto_respuesta=""):
+    """Guarda la consulta de inmediato en un archivo CSV local incluyendo la respuesta de Aura"""
     try:
         ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-        nuevo_registro = pd.DataFrame([{"Cuándo": ahora, "Qué preguntaron": texto_pregunta}])
+        nuevo_registro = pd.DataFrame([{
+            "Cuándo": ahora, 
+            "Qué preguntaron": texto_pregunta,
+            "Respuesta de Aura": texto_respuesta
+        }])
         
         if os.path.exists(ARCHIVO_BITACORA):
             nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='a', header=False, index=False, encoding='utf-8')
@@ -208,7 +212,6 @@ with tab_eda:
             st.warning(f"⏳ Para garantizar el acceso de todos los miembros del grupo, por favor espera {tiempo_espera} segundos antes de enviar otra consulta.")
         else:
             st.session_state.ultimo_envio = tiempo_actual
-            registrar_consulta_local(prompt)
             
             with st.chat_message("user", avatar="👤"):
                 st.markdown(prompt)
@@ -268,7 +271,12 @@ DIRECTRICES DE RESPUESTA:
                             config=config
                         )
                         
+                        # Se muestra la respuesta en pantalla
                         st.markdown(response.text)
+                        
+                        # PASO NUEVO: Guardar en la bitácora local asociando la pregunta con la respuesta emitida
+                        registrar_consulta_local(prompt, response.text)
+                        
                         st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": response.text})
                         
                         st.rerun()
@@ -277,6 +285,9 @@ DIRECTRICES DE RESPUESTA:
                         error_str = str(e)
                         clean_error = "Se ha agotado la cuota temporal de consultas de la API. El servicio se restablecerá pronto." if "RESOURCE_EXHAUSTED" in error_str else f"Ocurrió un inconveniente: {error_str}"
                         st.error(clean_error)
+                        
+                        # Si ocurre un error de API, se registra la pregunta indicando la falla en la columna de respuesta
+                        registrar_consulta_local(prompt, f"ERROR DE CONEXIÓN: {clean_error}")
 
 # ==========================================
 # PESTAÑA 2: PROFESOR
