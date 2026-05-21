@@ -28,7 +28,7 @@ def registrar_consulta_local(texto_pregunta, respuesta_aura):
         # Integración de la pregunta y la respuesta en una sola cadena de texto
         detalle_integrado = f"PREGUNTA: {p_limpia} | RESPUESTA DE AURA: {r_limpia}"
         
-        nuevo_registro = pd.DataFrame([{"Cuándo": ahora, "Detalle de la Consulta": detalle_integrado}])
+        nuevo_registro = pd.DataFrame([{"Cuándo": ahora, "Detalle de la Consulta": detalle_integrated}])
         
         if os.path.exists(ARCHIVO_BITACORA):
             nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='a', header=False, index=False, encoding='utf-8')
@@ -232,6 +232,7 @@ DIRECTRICES DE RESPUESTA:
             with st.chat_message("assistant", avatar="✨"):
                 if not api_key:
                     st.error("Error: No se encontró la configuración de la API Key ('gemini_api_key').")
+                    registrar_consulta_local(prompt, "ERROR: Configuración de API Key ausente.")
                 else:
                     try:
                         client = genai.Client(api_key=api_key)
@@ -258,14 +259,20 @@ DIRECTRICES DE RESPUESTA:
                         st.markdown(respuesta_texto)
                         st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta_texto})
                         
-                        # Registro con las variables unificadas en dos columnas
+                        # Guardado exitoso estándar
                         registrar_consulta_local(prompt, respuesta_texto)
-                        
                         st.rerun()
                         
                     except Exception as e:
                         error_str = str(e)
-                        clean_error = "Se ha agotado la cuota temporal de consultas de la API. El servicio se restablecerá pronto." if "RESOURCE_EXHAUSTED" in error_str else f"Ocurrió un inconveniente: {error_str}"
+                        if "RESOURCE_EXHAUSTED" in error_str:
+                            clean_error = "Se ha agotado la cuota temporal de consultas de la API. El servicio se restablecerá pronto."
+                            # Forzar el registro local detallando la caída por cuota
+                            registrar_consulta_local(prompt, "FALLO DE SISTEMA: Cuota temporal de API excedida.")
+                        else:
+                            clean_error = f"Ocurrió un inconveniente: {error_str}"
+                            registrar_consulta_local(prompt, f"FALLO DE SISTEMA: {error_str}")
+                        
                         st.error(clean_error)
 
 # ==========================================
