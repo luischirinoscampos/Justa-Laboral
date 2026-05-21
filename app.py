@@ -189,44 +189,32 @@ st.markdown("""
         border-radius: 12px !important;
     }
     
-    /* Contenedor de botones en fila */
-    .botonera {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-        width: 100%;
-    }
-    
-    /* Botón de profesor (izquierda) */
-    .btn-profesor button {
+    /* Botones en los extremos */
+    div[data-testid="column"]:first-child .stButton button {
         background-color: transparent !important;
         color: #4A5568 !important;
         font-size: 1.3rem !important;
         padding: 4px 12px !important;
-        box-shadow: none !important;
         border: 1px solid #CBD5E1 !important;
-        min-width: auto !important;
         border-radius: 8px !important;
+        box-shadow: none !important;
     }
-    .btn-profesor button:hover {
+    div[data-testid="column"]:first-child .stButton button:hover {
         color: #0A2540 !important;
         background-color: #F8FAFC !important;
         border-color: #0A2540 !important;
     }
     
-    /* Botón de reinicio (derecha) */
-    .btn-reinicio button {
+    div[data-testid="column"]:last-child .stButton button {
         background-color: transparent !important;
         color: #4A5568 !important;
         font-size: 1.3rem !important;
         padding: 4px 12px !important;
-        box-shadow: none !important;
         border: 1px solid #CBD5E1 !important;
-        min-width: auto !important;
         border-radius: 8px !important;
+        box-shadow: none !important;
     }
-    .btn-reinicio button:hover {
+    div[data-testid="column"]:last-child .stButton button:hover {
         color: #0A2540 !important;
         background-color: #F8FAFC !important;
         border-color: #0A2540 !important;
@@ -268,41 +256,26 @@ if "profesor_autenticado" not in st.session_state:
     st.session_state.profesor_autenticado = False
 
 # ==========================================
-# 9. FILA DE BOTONES (EXTREMO IZQUIERDO Y EXTREMO DERECHO)
+# 9. BOTONES EN LOS EXTREMOS (SIN HTML FANTASMA)
 # ==========================================
-# Usamos HTML para posicionar los botones en extremos opuestos
-st.markdown("""
-    <div class="botonera">
-        <div class="btn-profesor" id="profesor-btn">🔒</div>
-        <div class="btn-reinicio" id="reinicio-btn">🔄</div>
-    </div>
-""", unsafe_allow_html=True)
-
-# Pero Streamlit no permite capturar clics de HTML puro, así que usamos columnas
-# con pesos extremos: col1 (muy pequeña) y col3 (muy pequeña), col2 (espacio vacío)
-
 col_izq, col_espacio, col_der = st.columns([1, 10, 1])
 
 with col_izq:
-    st.markdown('<div class="btn-profesor">', unsafe_allow_html=True)
     if st.button("🔒", key="btn_profesor", help="Acceso profesor"):
         st.session_state.show_profesor = not st.session_state.show_profesor
         st.session_state.profesor_autenticado = False
         st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
 with col_der:
-    st.markdown('<div class="btn-reinicio">', unsafe_allow_html=True)
     if st.button("🔄", key="btn_reinicio", help="Reiniciar conversación"):
         reiniciar_conversacion()
         st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
-# Espacio después de los botones
+# Espacio después de botones
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ==========================================
-# 10. PANEL DEL PROFESOR (si está activo)
+# 10. PANEL DEL PROFESOR
 # ==========================================
 if st.session_state.show_profesor:
     with st.container():
@@ -384,12 +357,10 @@ REGLAS:
 # ==========================================
 # 13. INTERFAZ DE CHAT
 # ==========================================
-# Mostrar mensajes
 for message in st.session_state.messages:
     with st.chat_message(message["role"], avatar=message.get("avatar")):
         st.markdown(message["content"])
 
-# Input del chat
 prompt = st.chat_input("Escribe tu consulta jurídica aquí...")
 
 if prompt:
@@ -404,15 +375,13 @@ if prompt:
         st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
         
         with st.chat_message("assistant", avatar="✨"):
-            # Bloqueo de evaluaciones
             if es_intento_evaluacion(prompt):
-                respuesta = "📚 **Lo siento, no puedo ayudarte con evaluaciones.** Estoy para apoyar tu aprendizaje genuino. ¿Tienes alguna duda sobre el contenido?"
+                respuesta = "📚 **Lo siento, no puedo ayudarte con evaluaciones.** Estoy para apoyar tu aprendizaje genuino."
                 st.markdown(respuesta)
                 st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta})
                 registrar_consulta_dual(prompt, "[BLOQUEADO]")
                 st.stop()
             
-            # Verificar caché
             cache = obtener_cache(prompt)
             if cache:
                 st.markdown(cache)
@@ -420,7 +389,6 @@ if prompt:
                 registrar_consulta_dual(prompt, "[CACHÉ]")
                 st.rerun()
             
-            # Llamar a Gemini
             if not api_key:
                 st.error("Error: API Key no configurada.")
             else:
