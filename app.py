@@ -9,6 +9,7 @@ import json
 import re
 from collections import Counter
 import math
+import csv
 
 # 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Aura - Tutora Virtual", page_icon="✨", layout="centered")
@@ -21,7 +22,7 @@ ARCHIVO_BITACORA = "consultas_local.csv"
 ARCHIVO_CONOCIMIENTO = "vector_store.json"
 
 def registrar_consulta_local(texto_pregunta, texto_respuesta=""):
-    """Guarda la consulta y la respuesta de Aura encapsulándolas de forma segura en el CSV"""
+    """Guarda la consulta y la respuesta de Aura encapsulándolas con comillas de seguridad en el CSV"""
     try:
         ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
         nuevo_registro = pd.DataFrame([{
@@ -30,14 +31,14 @@ def registrar_consulta_local(texto_pregunta, texto_respuesta=""):
             "Respuesta de Aura": texto_respuesta
         }])
         
-        # Se fuerza el orden correcto de las columnas
+        # Forzar orden estricto de las tres columnas fijas
         nuevo_registro = nuevo_registro[["Cuándo", "Qué preguntaron", "Respuesta de Aura"]]
         
         if os.path.exists(ARCHIVO_BITACORA):
-            # Se añade el registro al final asegurando que los textos se mantengan encapsulados adecuadamente
-            nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='a', header=False, index=False, encoding='utf-8')
+            # Se añade al final protegiendo textos con caracteres especiales o comas
+            nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='a', header=False, index=False, encoding='utf-8', quoting=csv.QUOTE_MINIMAL)
         else:
-            nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='w', header=True, index=False, encoding='utf-8')
+            nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='w', header=True, index=False, encoding='utf-8', quoting=csv.QUOTE_MINIMAL)
     except Exception:
         pass
 
@@ -177,7 +178,7 @@ if "messages" not in st.session_state:
 if "ultimo_envio" not in st.session_state:
     st.session_state.ultimo_envio = 0.0
 
-# ENCABEZADO
+# ENCABEZADO CENTRADO
 st.markdown("""
     <div class="custom-header">
         <div class="line-1">Aura</div>
@@ -266,7 +267,7 @@ DIRECTRICES DE RESPUESTA:
                         
                         st.markdown(response.text)
                         
-                        # Almacenamiento seguro
+                        # Registro seguro de interacciones
                         registrar_consulta_local(prompt, response.text)
                         
                         st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": response.text})
@@ -279,7 +280,7 @@ DIRECTRICES DE RESPUESTA:
                         registrar_consulta_local(prompt, f"ERROR DE CONEXIÓN: {clean_error}")
 
 # ==========================================
-# PESTAÑA 2: PROFESOR (CON AUTO-REPARACIÓN DE BITÁCORA)
+# PESTAÑA 2: PROFESOR
 # ==========================================
 with tab_profesor:
     st.subheader("Bitácora de Consultas Locales")
@@ -291,10 +292,10 @@ with tab_profesor:
         if os.path.exists(ARCHIVO_BITACORA):
             df_log = None
             try:
-                # Intento estándar de lectura estructurada de 3 columnas
+                # Lectura limpia del estándar de 3 columnas fijas
                 df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
             except Exception:
-                # AUTO-REPARACIÓN: Si falla por el choque de columnas viejo/nuevo, se lee línea por línea de forma segura
+                # Lógica de contingencia por si quedaran residuos antiguos desalineados
                 try:
                     filas_reparadas = []
                     with open(ARCHIVO_BITACORA, "r", encoding="utf-8") as f:
@@ -302,13 +303,12 @@ with tab_profesor:
                     
                     for i, linea in enumerate(lineas):
                         if i == 0 or not linea.strip():
-                            continue  # Saltar cabecera vieja
+                            continue
                         
-                        # Limpieza y separación por comas básica controlada
                         partes = linea.split(",", 2)
                         cuando = partes[0].strip() if len(partes) > 0 else ""
                         pregunta = partes[1].strip() if len(partes) > 1 else ""
-                        respuesta = partes[2].strip() if len(partes) > 2 else "No registrada (Bitácora anterior)"
+                        respuesta = partes[2].strip() if len(partes) > 2 else "Línea previa"
                         
                         filas_reparadas.append({
                             "Cuándo": cuando,
@@ -316,14 +316,12 @@ with tab_profesor:
                             "Respuesta de Aura": respuesta
                         })
                     
-                    # Sobrescribir el archivo dañado con la estructura nueva y limpia
                     if filas_reparadas:
                         df_log = pd.DataFrame(filas_reparadas)[["Cuándo", "Qué preguntaron", "Respuesta de Aura"]]
-                        df_log.to_csv(ARCHIVO_BITACORA, index=False, encoding='utf-8')
+                        df_log.to_csv(ARCHIVO_BITACORA, index=False, encoding='utf-8', quoting=csv.QUOTE_MINIMAL)
                 except Exception as e_reparacion:
-                    st.error(f"Error crítico en la auto-reparación: {e_reparacion}")
+                    st.error(f"Error en procesamiento: {e_reparacion}")
 
-            # Desplegar la información en pantalla una vez procesada/reparada
             if df_log is not None and not df_log.empty:
                 st.dataframe(df_log.iloc[::-1], use_container_width=True)
                 
@@ -335,6 +333,6 @@ with tab_profesor:
                     mime="text/csv"
                 )
             else:
-                st.info("La bitácora está lista y esperando nuevos registros estructurados.")
+                st.info("La bitácora está lista y esperando nuevos registros.")
         else:
             st.info("Aún no se registran interacciones en este servidor.")
