@@ -21,8 +21,12 @@ def registrar_consulta_local(texto_pregunta, respuesta_aura):
     """Guarda la consulta en un archivo CSV local con estructura estricta de dos columnas"""
     try:
         ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+        # Se eliminan saltos de línea y retornos para evitar que rompan las filas del CSV
+        p_limpia = str(texto_pregunta).replace("\n", " ").replace("\r", " ")
+        r_limpia = str(respuesta_aura).replace("\n", " ").replace("\r", " ")
+        
         # Integración de la pregunta y la respuesta en una sola cadena de texto
-        detalle_integrado = f"PREGUNTA: {texto_pregunta} | RESPUESTA DE AURA: {respuesta_aura}"
+        detalle_integrado = f"PREGUNTA: {p_limpia} | RESPUESTA DE AURA: {r_limpia}"
         
         nuevo_registro = pd.DataFrame([{"Cuándo": ahora, "Detalle de la Consulta": detalle_integrado}])
         
@@ -254,7 +258,7 @@ DIRECTRICES DE RESPUESTA:
                         st.markdown(respuesta_texto)
                         st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta_texto})
                         
-                        # Captura e integra los datos antes de guardarlos
+                        # Registro con las variables unificadas en dos columnas
                         registrar_consulta_local(prompt, respuesta_texto)
                         
                         st.rerun()
@@ -277,8 +281,13 @@ with tab_profesor:
         if os.path.exists(ARCHIVO_BITACORA):
             try:
                 df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
+                
+                # CONTROL DE COMPATIBILIDAD: Si el archivo cargado no tiene la columna nueva, se limpia para evitar fallos de índice
+                if not df_log.empty and "Detalle de la Consulta" not in df_log.columns:
+                    os.remove(ARCHIVO_BITACORA)
+                    df_log = pd.DataFrame(columns=["Cuándo", "Detalle de la Consulta"])
+                
                 if not df_log.empty:
-                    # Garantiza que la visualización tenga estrictamente las dos columnas correctas
                     df_render = df_log[["Cuándo", "Detalle de la Consulta"]]
                     st.dataframe(df_render.iloc[::-1], use_container_width=True)
                     
@@ -290,9 +299,8 @@ with tab_profesor:
                         mime="text/csv"
                     )
                 else:
-                    st.info("El archivo de bitácora está vacío.")
+                    st.info("El archivo de bitácora está vacío o se ha restablecido para actualizar el formato.")
             except Exception as e:
-                st.error(f"Error al leer la bitácora local de forma estructurada: {e}")
-                st.info("Nota técnica: Para evitar conflictos visuales con el esquema de tres columnas viejo, elimine el archivo 'consultas_local.csv' anterior del servidor para que el nuevo sistema lo genere limpio.")
+                st.error(f"Error al procesar la bitácora estructurada: {e}")
         else:
             st.info("Aún no se registran interacciones en este servidor.")
