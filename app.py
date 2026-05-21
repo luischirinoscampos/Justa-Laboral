@@ -30,11 +30,11 @@ def reiniciar_conversacion():
             "role": "assistant",
             "avatar": "✨",
             "content": (
-                "✨ ¡Hola! Soy **Aura**, tu tutora académica en Derecho del Trabajo.\n\n"
+                "🎉 ¡Hola! Soy **Aura**, tu tutora académica en Derecho del Trabajo.\n\n"
                 "Pertenezco al **Ecosistema Digital de Aprendizaje (EDA)** de esta unidad curricular, "
                 "creada y desarrollada por el **Prof. Luis Ignacio Chirinos Campos**.\n\n"
                 "Estoy aquí para acompañarte en tu **aprendizaje** con claridad, calidez y rigor jurídico.\n\n"
-                "📌 **¿Qué puedo hacer por ti?**\n"
+                "🔴 **¿Qué puedo hacer por ti?**\n"
                 "- Resolver dudas sobre los contenidos de la unidad\n"
                 "- Explicar conceptos jurídicos complejos de forma sencilla\n"
                 "- Ayudarte a preparar tus estudios\n"
@@ -45,7 +45,6 @@ def reiniciar_conversacion():
         }
     ]
     st.session_state.ultimo_envio = 0.0
-    # También cerramos el panel del profesor si estaba abierto
     st.session_state.show_profesor = False
     st.session_state.profesor_autenticado = False
 
@@ -139,7 +138,7 @@ def registrar_consulta_dual(texto_pregunta, respuesta_o_error):
         pass
 
 # ==========================================
-# 6. ESTILOS CSS (fondo blanco total)
+# 6. ESTILOS CSS
 # ==========================================
 st.markdown("""
     <style>
@@ -190,24 +189,26 @@ st.markdown("""
         border-radius: 12px !important;
     }
     
-    /* Botones */
-    .stButton > button {
+    /* Botón de reinicio (derecha) - normal */
+    .reinicio-btn button {
         background-color: #0A2540 !important;
         color: white !important;
         border-radius: 8px !important;
     }
     
-    /* Botón discreto del profesor (sin fondo llamativo) */
-    div[data-testid="column"] .stButton > button {
+    /* Botón de profesor (izquierda) - discreto */
+    .profesor-btn button {
         background-color: transparent !important;
         color: #4A5568 !important;
-        font-size: 1.2rem !important;
-        padding: 0px 8px !important;
+        font-size: 1rem !important;
+        padding: 4px 12px !important;
         box-shadow: none !important;
+        border: 1px solid #CBD5E1 !important;
     }
-    div[data-testid="column"] .stButton > button:hover {
+    .profesor-btn button:hover {
         color: #0A2540 !important;
-        background-color: transparent !important;
+        background-color: #F8FAFC !important;
+        border-color: #0A2540 !important;
     }
     
     /* Ocultar elementos */
@@ -246,49 +247,31 @@ if "profesor_autenticado" not in st.session_state:
     st.session_state.profesor_autenticado = False
 
 # ==========================================
-# 9. DETECCIÓN DE EVALUACIONES
+# 9. BARRA SUPERIOR CON BOTONES POSICIONADOS
 # ==========================================
-PALABRAS_EVALUACION = [
-    "examen", "evaluación", "prueba", "cuestionario", "respuesta del examen",
-    "dame la respuesta", "cuál es la opción", "qué pongo", "respuesta correcta"
-]
+# Usamos layout de columnas: [1] Profesor | [8] espacio | [1] Reinicio
+col_izq, col_centro, col_der = st.columns([1, 8, 1])
 
-def es_intento_evaluacion(pregunta: str) -> bool:
-    return any(palabra in pregunta.lower() for palabra in PALABRAS_EVALUACION)
-
-# ==========================================
-# 10. SYSTEM INSTRUCTION
-# ==========================================
-def get_system_instruction():
-    return f"""
-Eres AURA, tutora de Derecho del Trabajo del EDA creado por el Prof. Luis Ignacio Chirinos Campos.
-
-CONTEXTO DE CÁTEDRA:
-{CONTEXTO_BASE}
-
-REGLAS:
-- Responde con claridad, calidez y rigor jurídico.
-- Máximo 3 párrafos. Usa **negritas** para conceptos clave.
-- NO ayudas a resolver exámenes o evaluaciones.
-- Cita las fuentes del contexto.
-"""
-
-# ==========================================
-# 11. BARRA SUPERIOR CON BOTONES (Reinicio + Profesor discreto)
-# ==========================================
-col1, col2, col3 = st.columns([5, 1, 1])
-with col2:
-    if st.button("🔄", help="Reiniciar conversación"):
-        reiniciar_conversacion()
-        st.rerun()
-with col3:
-    if st.button("🔒", help="Acceso profesor"):
+with col_izq:
+    st.markdown('<div class="profesor-btn">', unsafe_allow_html=True)
+    if st.button("🔒 Profesor", key="btn_profesor", help="Acceso para profesores"):
         st.session_state.show_profesor = not st.session_state.show_profesor
         st.session_state.profesor_autenticado = False
         st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with col_der:
+    st.markdown('<div class="reinicio-btn">', unsafe_allow_html=True)
+    if st.button("🔄 Reiniciar", key="btn_reinicio", help="Reiniciar conversación"):
+        reiniciar_conversacion()
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# Espacio después de los botones
+st.markdown("<br>", unsafe_allow_html=True)
 
 # ==========================================
-# 12. PANEL DEL PROFESOR (si está activo)
+# 10. PANEL DEL PROFESOR (si está activo)
 # ==========================================
 if st.session_state.show_profesor:
     with st.container():
@@ -307,7 +290,6 @@ if st.session_state.show_profesor:
         else:
             st.success("✅ Sesión activa")
             
-            # Mostrar bitácora
             if os.path.exists(ARCHIVO_BITACORA):
                 try:
                     df = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
@@ -321,13 +303,13 @@ if st.session_state.show_profesor:
                             mime="text/csv"
                         )
                         
-                        # Estadísticas
                         st.markdown("---")
                         st.subheader("📊 Estadísticas")
                         st.metric("Total de consultas", len(df))
-                        bloqueos = df[df["Respuesta de Aura"].str.contains("BLOQUEADO", na=False)].shape[0] if "Respuesta de Aura" in df.columns else 0
-                        if bloqueos > 0:
-                            st.warning(f"🚨 Intentos bloqueados: {bloqueos}")
+                        if "Respuesta de Aura" in df.columns:
+                            bloqueos = df[df["Respuesta de Aura"].str.contains("BLOQUEADO", na=False)].shape[0]
+                            if bloqueos > 0:
+                                st.warning(f"🚨 Intentos bloqueados: {bloqueos}")
                     else:
                         st.info("No hay registros aún.")
                 except Exception as e:
@@ -335,11 +317,38 @@ if st.session_state.show_profesor:
             else:
                 st.info("No hay registros aún.")
             
-            # Botón para cerrar panel
             if st.button("🔒 Cerrar panel"):
                 st.session_state.show_profesor = False
                 st.session_state.profesor_autenticado = False
                 st.rerun()
+
+# ==========================================
+# 11. DETECCIÓN DE EVALUACIONES
+# ==========================================
+PALABRAS_EVALUACION = [
+    "examen", "evaluación", "prueba", "cuestionario", "respuesta del examen",
+    "dame la respuesta", "cuál es la opción", "qué pongo", "respuesta correcta"
+]
+
+def es_intento_evaluacion(pregunta: str) -> bool:
+    return any(palabra in pregunta.lower() for palabra in PALABRAS_EVALUACION)
+
+# ==========================================
+# 12. SYSTEM INSTRUCTION
+# ==========================================
+def get_system_instruction():
+    return f"""
+Eres AURA, tutora de Derecho del Trabajo del EDA creado por el Prof. Luis Ignacio Chirinos Campos.
+
+CONTEXTO DE CÁTEDRA:
+{CONTEXTO_BASE}
+
+REGLAS:
+- Responde con claridad, calidez y rigor jurídico.
+- Máximo 3 párrafos. Usa **negritas** para conceptos clave.
+- NO ayudas a resolver exámenes o evaluaciones.
+- Cita las fuentes del contexto.
+"""
 
 # ==========================================
 # 13. INTERFAZ DE CHAT
