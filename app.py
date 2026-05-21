@@ -4,26 +4,25 @@ from google.genai import types
 from datetime import datetime
 import pandas as pd
 import os
-import time
 import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-# 1. CONFIGURACIÓN DE PÁGINA
+# --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Aura - Tutora Virtual", page_icon="✨", layout="centered")
 
-# Recuperación de credenciales
+# --- SECRETOS ---
 api_key = st.secrets.get("gemini_api_key", None)
 ARCHIVO_BITACORA = "consultas_local.csv"
 ARCHIVO_CONOCIMIENTO = "vector_store.json"
 NOMBRE_HOJA_SHEETS = "Bitacora_Aura"
 
-# 2. FUNCIONES DE SERVICIO (GOOGLE SHEETS Y LOCAL)
+# --- FUNCIONES DE SERVICIO ---
 def conectar_google_sheets():
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         private_key = st.secrets["gspread"]["private_key"].replace("\\n", "\n")
-        credenciales_dict = {
+        creds = ServiceAccountCredentials.from_json_keyfile_dict({
             "type": st.secrets["gspread"]["type"],
             "project_id": st.secrets["gspread"]["project_id"],
             "private_key_id": st.secrets["gspread"]["private_key_id"],
@@ -34,8 +33,7 @@ def conectar_google_sheets():
             "token_uri": st.secrets["gspread"]["token_uri"],
             "auth_provider_x509_cert_url": st.secrets["gspread"]["auth_provider_x509_cert_url"],
             "client_x509_cert_url": st.secrets["gspread"]["client_x509_cert_url"]
-        }
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(credenciales_dict, scope)
+        }, scope)
         gc = gspread.authorize(creds)
         return gc.open(NOMBRE_HOJA_SHEETS).sheet1
     except:
@@ -45,19 +43,17 @@ def registrar_consulta_dual(p, r):
     ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
     p_limpia, r_limpia = str(p).replace("\n", " ").strip(), str(r).replace("\n", " ").strip()
     
-    # Registro CSV local
+    # CSV
     df = pd.DataFrame([{"Cuándo": ahora, "Pregunta": p_limpia, "Respuesta": r_limpia}])
     df.to_csv(ARCHIVO_BITACORA, mode='a', header=not os.path.exists(ARCHIVO_BITACORA), index=False, encoding='utf-8')
     
-    # Registro Google Sheets
+    # Sheets
     hoja = conectar_google_sheets()
     if hoja:
-        try:
-            hoja.append_row([ahora, p_limpia, r_limpia])
-        except:
-            pass
+        try: hoja.append_row([ahora, p_limpia, r_limpia])
+        except: pass
 
-# 3. INTERFAZ Y ESTILOS
+# --- ESTILOS CSS ---
 st.markdown("""
     <style>
     .custom-header { text-align: center; margin-bottom: 20px; font-family: 'Inter', sans-serif; }
@@ -72,7 +68,7 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# 4. APP PRINCIPAL
+# --- APP ---
 tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
 
 with tab_eda:
@@ -80,13 +76,11 @@ with tab_eda:
         st.session_state.messages = [{"role": "assistant", "content": "Bienvenido, ¿qué consulta tienes hoy?"}]
     
     for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+        with st.chat_message(msg["role"]): st.markdown(msg["content"])
             
     if prompt := st.chat_input("Escribe tu consulta..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+        with st.chat_message("user"): st.markdown(prompt)
             
         with st.chat_message("assistant"):
             respuesta = ""
@@ -96,17 +90,16 @@ with tab_eda:
                 respuesta = response.text
             except Exception as e:
                 err = str(e)
-                respuesta = "ERROR DE CONEXIÓN: Se ha agotado la cuota de la API." if "429" in err or "RESOURCE" in err else f"ERROR: {err}"
+                respuesta = "ERROR: Cuota de API agotada." if any(x in err for x in ["429", "RESOURCE_EXHAUSTED"]) else f"ERROR: {err}"
                 st.error(respuesta)
             
             st.markdown(respuesta)
             st.session_state.messages.append({"role": "assistant", "content": respuesta})
+            # El registro ocurre SIEMPRE aquí abajo, independientemente del éxito de la API
             registrar_consulta_dual(prompt, respuesta)
 
 with tab_profesor:
     st.subheader("Bitácora de Consultas")
     if st.text_input("Credencial Docente", type="password") == "UCLA2026":
-        if os.path.exists(ARCHIVO_BITACORA):
-            st.dataframe(pd.read_csv(ARCHIVO_BITACORA))
-        else:
-            st.info("Sin registros.")
+        if os.path.exists(ARCHIVO_BITACORA): st.dataframe(pd.read_csv(ARCHIVO_BITACORA))
+        else: st.info("Sin registros.")
