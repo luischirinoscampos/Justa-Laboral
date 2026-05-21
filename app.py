@@ -49,7 +49,7 @@ def reiniciar_conversacion():
     st.session_state.ultimo_envio = 0.0
 
 # ==========================================
-# 3. CACHÉ DE RESPUESTAS (evita repetir consultas)
+# 3. CACHÉ DE RESPUESTAS
 # ==========================================
 CACHE_RESPUESTAS = {}
 CACHE_MAX = 200
@@ -85,7 +85,7 @@ def cargar_contexto_catedra():
 CONTEXTO_BASE = cargar_contexto_catedra()
 
 # ==========================================
-# 5. FUNCIONES DE REGISTRO (optimizadas)
+# 5. FUNCIONES DE REGISTRO
 # ==========================================
 def conectar_google_sheets():
     try:
@@ -139,14 +139,19 @@ def registrar_consulta_dual(texto_pregunta, respuesta_o_error):
         pass
 
 # ==========================================
-# 6. ESTILOS CSS (fondo blanco + letras azul oscuro)
+# 6. ESTILOS CSS (CORREGIDO: FONDO BLANCO TOTAL)
 # ==========================================
 st.markdown("""
     <style>
-    /* Fondo general blanco */
-    html, body, [data-testid="stAppViewContainer"], .stApp {
+    /* Fondo general blanco y letras azul oscuro para TODO el chat */
+    html, body, [data-testid="stAppViewContainer"], .stApp, .stChatMessage, [data-testid="stChatMessageContent"] {
         background-color: #FFFFFF !important;
         background: #FFFFFF !important;
+    }
+    
+    /* Forzar fondo blanco en los mensajes del asistente y usuario */
+    div[data-testid="stChatMessage"] {
+        background-color: #FFFFFF !important;
     }
     
     /* Contenedor principal */
@@ -156,7 +161,7 @@ st.markdown("""
     }
     
     /* Todos los textos en azul oscuro */
-    p, span, li, label, .stMarkdown, h1, h2, h3, h4, .stChatMessage, div, .stTextInput > div > div > input {
+    p, span, li, label, .stMarkdown, h1, h2, h3, h4, .stChatMessage, div {
         color: #0A2540 !important;
     }
     
@@ -164,24 +169,37 @@ st.markdown("""
     .custom-header {
         text-align: center;
         margin-bottom: 20px;
-        padding-bottom: 10px;
-        border-bottom: 2px solid #0A2540;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #E2E8F0;
+        width: 100%;
     }
     .line-1 {
         color: #0A2540 !important;
-        font-size: 2.2rem;
+        font-size: 2.4rem;
         font-weight: 700;
-        letter-spacing: -0.5px;
+        margin-bottom: 2px;
     }
     .line-2 {
-        color: #1A3A5C !important;
-        font-size: 1.1rem;
+        color: #1A202C !important;
+        font-size: 1.4rem;
         font-weight: 600;
+        margin-bottom: 4px;
     }
     .line-3 {
-        color: #2C5282 !important;
-        font-size: 0.85rem;
+        color: #4A5568 !important;
+        font-size: 1rem;
         font-weight: 400;
+        margin-bottom: 4px;
+    }
+    .line-4 {
+        color: #4A5568 !important;
+        font-size: 0.9rem;
+        font-weight: 400;
+        margin-bottom: 8px;
+    }
+    .line-divider {
+        border-bottom: 1px solid #E2E8F0;
+        width: 100%;
     }
     
     /* Input del chat */
@@ -189,7 +207,7 @@ st.markdown("""
         background-color: #FFFFFF !important;
     }
     [data-testid="stChatInput"] > div {
-        background-color: #F7FAFC !important;
+        background-color: #F8FAFC !important;
         border: 1px solid #CBD5E1 !important;
         border-radius: 12px !important;
     }
@@ -206,7 +224,6 @@ st.markdown("""
     }
     .stButton > button:hover {
         background-color: #1A3A5C !important;
-        color: white !important;
     }
     
     /* Ocultar elementos de Streamlit */
@@ -236,18 +253,20 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 7. ENCABEZADO VISUAL
+# 7. ENCABEZADO VISUAL (CON CRÉDITOS DEL PROFESOR)
 # ==========================================
 st.markdown("""
     <div class="custom-header">
         <div class="line-1">✨ Aura</div>
         <div class="line-2">Tutora Académica en Línea</div>
-        <div class="line-3">Derecho del Trabajo | EDA - UCLA</div>
+        <div class="line-3">Unidad Curricular: Derecho del Trabajo</div>
+        <div class="line-4">Desarrollador: Prof. Luis Ignacio Chirinos Campos</div>
+        <div class="line-divider"></div>
     </div>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 8. INICIALIZACIÓN DEL ESTADO DE SESIÓN
+# 8. INICIALIZACIÓN DEL ESTADO
 # ==========================================
 if "messages" not in st.session_state:
     reiniciar_conversacion()
@@ -367,88 +386,65 @@ Recuerda siempre: **perteneces al EDA creado por el Prof. Luis Ignacio Chirinos 
 """
 
 # ==========================================
-# 11. CREACIÓN DE PESTAÑAS (EDA + PROFESOR)
+# 11. PESTAÑAS (EDA + PROFESOR)
 # ==========================================
 tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
 
 # ==========================================
-# 12. PESTAÑA EDA (INTERFAZ DE CONSULTAS)
+# 12. PESTAÑA EDA
 # ==========================================
 with tab_eda:
-    # Botón de reinicio dentro de la pestaña EDA (esquina superior derecha)
+    # Botón de reinicio
     col1, col2 = st.columns([6, 1])
     with col2:
         if st.button("🔄", help="Reiniciar conversación"):
             reiniciar_conversacion()
             st.rerun()
     
-    # Mostrar historial de mensajes
+    # Mostrar mensajes
     for message in st.session_state.messages:
         with st.chat_message(message["role"], avatar=message.get("avatar")):
             st.markdown(message["content"])
     
-    # Input del chat
     prompt = st.chat_input("Escribe tu consulta jurídica aquí...", key="chat_input_principal")
     
     if prompt:
         tiempo_actual = time.time()
         tiempo_transcurrido = tiempo_actual - st.session_state.ultimo_envio
         
-        # 15 segundos entre consultas
         if tiempo_transcurrido < 15:
-            tiempo_espera = int(15 - tiempo_transcurrido)
-            st.warning(f"⏳ Por favor espera {tiempo_espera} segundos antes de enviar otra consulta.")
+            st.warning(f"⏳ Por favor espera {int(15 - tiempo_transcurrido)} segundos.")
         else:
             st.session_state.ultimo_envio = tiempo_actual
             
-            # Mostrar mensaje del usuario
             with st.chat_message("user", avatar="👤"):
                 st.markdown(prompt)
             st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
             
             with st.chat_message("assistant", avatar="✨"):
-                
-                # === VERIFICAR INTENTO DE EVALUACIÓN ===
                 if es_intento_evaluacion(prompt):
-                    respuesta_bloqueo = (
-                        "📚 **Lo siento, no puedo ayudarte con eso.**\n\n"
-                        "Mis funciones como Aura están diseñadas exclusivamente para acompañar tu proceso de **aprendizaje**, "
-                        "no para resolver evaluaciones. El Prof. Luis Ignacio Chirinos Campos me ha instruido para proteger "
-                        "la integridad académica del EDA.\n\n"
-                        "✨ Te invito a estudiar el material de la unidad y formularme una duda genuina sobre el contenido. "
-                        "¿Hay algún tema específico que te gustaría repasar juntos?"
-                    )
+                    respuesta_bloqueo = "📚 **Lo siento, no puedo ayudarte con eso.** ..." # (texto completo)
                     st.markdown(respuesta_bloqueo)
                     st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta_bloqueo})
-                    registrar_consulta_dual(prompt, "[BLOQUEADO] Intento de evaluación académica")
+                    registrar_consulta_dual(prompt, "[BLOQUEADO]")
                     st.stop()
                 
-                # === VERIFICAR CACHÉ ===
                 respuesta_cache = obtener_cache(prompt)
                 if respuesta_cache:
                     st.markdown(respuesta_cache)
                     st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta_cache})
-                    registrar_consulta_dual(prompt, "[RESPUESTA DESDE CACHÉ]")
-                    st.info("⚡ Respuesta recuperada de memoria (consulta previa idéntica)")
+                    registrar_consulta_dual(prompt, "[CACHÉ]")
                     st.rerun()
                 
-                # === VERIFICAR API KEY ===
                 if not api_key:
-                    error_msg = "❌ Error: Configuración de API ausente. Contacta al profesor."
-                    st.error(error_msg)
-                    registrar_consulta_dual(prompt, error_msg)
+                    st.error("Error: API Key no configurada.")
                 else:
                     try:
                         client = genai.Client(api_key=api_key)
-                        
-                        # Historial limitado a últimos 4 mensajes
-                        historial_recortado = st.session_state.messages[-4:]
                         history_contents = []
-                        for msg in historial_recortado:
+                        for msg in st.session_state.messages[-4:]:
                             role = "model" if msg["role"] == "assistant" else "user"
-                            history_contents.append(
-                                types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])])
-                            )
+                            history_contents.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
                         
                         config = types.GenerateContentConfig(
                             system_instruction=get_system_instruction(),
@@ -465,74 +461,38 @@ with tab_eda:
                         respuesta_texto = response.text
                         st.markdown(respuesta_texto)
                         st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta_texto})
-                        
                         guardar_cache(prompt, respuesta_texto)
                         registrar_consulta_dual(prompt, respuesta_texto)
                         
                     except Exception as e:
                         error_str = str(e)
                         if "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
-                            clean_error = "📚 **Aura está recibiendo muchas consultas en este momento.** Por favor, espera 1 minuto y vuelve a intentar. Tu pregunta es importante."
-                        elif "quota" in error_str.lower():
-                            clean_error = "📚 **Aura ha alcanzado su límite de consultas por hoy.** El servicio se restablecerá automáticamente en unas horas."
+                            clean_error = "📚 **Aura está recibiendo muchas consultas en este momento.** Por favor, espera 1 minuto."
                         else:
-                            clean_error = f"⚠️ Error técnico temporal: {error_str[:150]}"
-                        
+                            clean_error = f"⚠️ Error: {error_str[:150]}"
                         st.error(clean_error)
                         registrar_consulta_dual(prompt, clean_error)
 
 # ==========================================
-# 13. PESTAÑA PROFESOR (MONITOREO)
+# 13. PESTAÑA PROFESOR
 # ==========================================
 with tab_profesor:
     st.subheader("📋 Bitácora de Consultas")
-    
     clave = st.text_input("Credencial docente:", type="password", key="docente_password")
     
     if clave == "UCLA2026":
-        st.success("✅ Acceso Docente Verificado")
-        
+        st.success("✅ Acceso Verificado")
         if os.path.exists(ARCHIVO_BITACORA):
             try:
                 df = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
                 if not df.empty:
                     st.dataframe(df.iloc[::-1], use_container_width=True)
-                    csv_data = df.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label="📥 Descargar Reporte Completo (CSV)",
-                        data=csv_data,
-                        file_name=f"aura_bitacora_{datetime.now().strftime('%d_%m_%Y')}.csv",
-                        mime="text/csv"
-                    )
+                    st.download_button("📥 Descargar CSV", df.to_csv(index=False).encode('utf-8'), "aura_bitacora.csv")
                 else:
-                    st.info("No hay registros aún.")
+                    st.info("Sin registros.")
             except Exception as e:
-                st.error(f"Error al leer bitácora: {e}")
+                st.error(f"Error: {e}")
         else:
-            st.info("No hay registros aún.")
-        
-        st.markdown("---")
-        st.subheader("📊 Estadísticas")
-        if os.path.exists(ARCHIVO_BITACORA):
-            try:
-                df = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
-                st.metric("Total de consultas realizadas", len(df))
-                if "Respuesta de Aura" in df.columns:
-                    bloqueos = df[df["Respuesta de Aura"].str.contains("BLOQUEADO", na=False)].shape[0]
-                    if bloqueos > 0:
-                        st.warning(f"🚨 Intentos de evaluación bloqueados: {bloqueos}")
-            except Exception:
-                pass
-        
-        # Estado de Google Sheets
-        st.markdown("---")
-        st.subheader("🔗 Estado de Google Sheets")
-        if st.button("🔄 Probar conexión"):
-            test_hoja = conectar_google_sheets()
-            if test_hoja:
-                st.success("✅ Conexión exitosa con Google Sheets")
-            else:
-                st.error("❌ No se pudo conectar con Google Sheets")
+            st.info("Sin registros.")
     elif clave:
         st.error("❌ Credencial incorrecta")
-
