@@ -9,16 +9,14 @@ import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-# --- CONFIGURACIÓN DE PÁGINA ---
+# --- CONFIGURACIÓN Y SECRETOS ---
 st.set_page_config(page_title="Aura - Tutora Virtual", page_icon="✨", layout="centered")
-
-# --- SECRETOS Y RUTAS ---
 api_key = st.secrets.get("gemini_api_key", None)
 ARCHIVO_BITACORA = "consultas_local.csv"
 ARCHIVO_CONOCIMIENTO = "vector_store.json"
 NOMBRE_HOJA_SHEETS = "Bitacora_Aura"
 
-# --- FUNCIONES DE SERVICIO ---
+# --- FUNCIONES DE SERVICIO (GOOGLE SHEETS Y LOCAL) ---
 def conectar_google_sheets():
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -44,10 +42,10 @@ def conectar_google_sheets():
 def registrar_consulta_dual(p, r):
     ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
     p_limpia, r_limpia = str(p).replace("\n", " ").strip(), str(r).replace("\n", " ").strip()
-    # Registro CSV
+    # Registro CSV local
     df = pd.DataFrame([{"Cuándo": ahora, "Pregunta": p_limpia, "Respuesta": r_limpia}])
     df.to_csv(ARCHIVO_BITACORA, mode='a', header=not os.path.exists(ARCHIVO_BITACORA), index=False, encoding='utf-8')
-    # Registro Sheets
+    # Registro Google Sheets
     hoja = conectar_google_sheets()
     if hoja:
         try:
@@ -62,9 +60,7 @@ def cargar_contexto():
             return json.load(f)
     return []
 
-CONTEXTO_LEGAL = cargar_contexto()
-
-# --- ESTILOS CSS Y PRESENTACIÓN ---
+# --- INTERFAZ VISUAL ---
 st.markdown("""
     <style>
     .custom-header { text-align: center; margin-bottom: 20px; font-family: 'Inter', sans-serif; }
@@ -79,7 +75,7 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# --- APLICACIÓN ---
+# --- APP PRINCIPAL ---
 tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
 
 with tab_eda:
