@@ -19,18 +19,22 @@ ARCHIVO_BITACORA = "consultas_local.csv"
 ARCHIVO_CONOCIMIENTO = "vector_store.json"
 
 def registrar_consulta_local(texto_pregunta, texto_respuesta=""):
-    """Guarda la consulta y respuesta encapsulando todo entre comillas para evitar fracturas por comas"""
+    """
+    Guarda la consulta y la respuesta en un único instante.
+    Usa csv.QUOTE_ALL para asegurar que las comas de la pregunta o respuesta
+    no fracturen las columnas en el archivo físico.
+    """
     try:
         ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
         archivo_existe = os.path.exists(ARCHIVO_BITACORA)
         
-        # Se abre en modo append protegiendo los campos con QUOTE_ALL de forma nativa
-        with open(ARCHIVO_BITACORA, mode="a", encoding="utf-8", newline="") as f:
-            escritor = csv.writer(f, delimiter=",", quoting=csv.QUOTE_ALL)
+        with open(ARCHIVO_BITACORA, mode='a', encoding='utf-8', newline='') as f:
+            escritor = csv.writer(f, delimiter=',', quoting=csv.QUOTE_ALL)
             
+            # Si el archivo es nuevo, escribe la cabecera con las 3 columnas fijas
             if not archivo_existe:
                 escritor.writerow(["Cuándo", "Qué preguntaron", "Respuesta de Aura"])
-                
+            
             escritor.writerow([ahora, texto_pregunta, texto_respuesta])
     except Exception:
         pass
@@ -97,7 +101,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Inicialización del historial de conversación
+# Inicialización obligatoria del historial antes de las pestañas
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {
@@ -188,6 +192,7 @@ DIRECTRICES DE RESPUESTA:
             with st.chat_message("assistant", avatar="✨"):
                 if not api_key:
                     st.error("Error: No se encontró la configuración de la API Key ('gemini_api_key').")
+                    registrar_consulta_local(prompt, "Error: Configuración de API Key ausente.")
                 else:
                     try:
                         client = genai.Client(api_key=api_key)
@@ -211,17 +216,20 @@ DIRECTRICES DE RESPUESTA:
                         )
                         
                         st.markdown(response.text)
-                        registrar_consulta_local(prompt, response.text)
                         st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": response.text})
+                        
+                        # AQUÍ SE REGISTRA: Una sola llamada limpia con ambos datos tras el éxito de la respuesta
+                        registrar_consulta_local(prompt, response.text)
                         st.rerun()
                         
                     except Exception as e:
                         error_str = str(e)
                         clean_error = "Se ha agotado la cuota temporal de consultas de la API. El servicio se restablecerá pronto." if "RESOURCE_EXHAUSTED" in error_str else f"Ocurrió un inconveniente: {error_str}"
                         st.error(clean_error)
-                        # Registrar la excepción controlada respetando las columnas
-                        registrar_consulta_local(prompt, clean_error)
                         st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": clean_error})
+                        
+                        # AQUÍ SE REGISTRA EL ERROR EXPLICITO: Sin duplicar llamadas ni alterar la estructura
+                        registrar_consulta_local(prompt, f"ERROR DE CONEXIÓN: {clean_error}")
                         st.rerun()
 
 # ==========================================
@@ -236,13 +244,8 @@ with tab_profesor:
         
         if os.path.exists(ARCHIVO_BITACORA):
             try:
-                # Lectura blindada bajo el mismo estándar de encapsulación estricta por comillas
-                df_log = pd.read_csv(
-                    ARCHIVO_BITACORA, 
-                    encoding='utf-8', 
-                    quoting=csv.QUOTE_ALL, 
-                    on_bad_lines='skip'
-                )
+                # Lectura limpia respetando el quoting de strings completo
+                df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8', quoting=csv.QUOTE_ALL, on_bad_lines='skip')
                 
                 if not df_log.empty:
                     st.dataframe(df_log.iloc[::-1], use_container_width=True)
