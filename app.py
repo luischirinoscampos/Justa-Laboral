@@ -7,6 +7,7 @@ import os
 import time
 import json
 import hashlib
+import re
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
@@ -256,7 +257,7 @@ if "profesor_autenticado" not in st.session_state:
     st.session_state.profesor_autenticado = False
 
 # ==========================================
-# 9. BOTONES EN LOS EXTREMOS (SIN HTML FANTASMA)
+# 9. BOTONES EN LOS EXTREMOS
 # ==========================================
 col_izq, col_espacio, col_der = st.columns([1, 10, 1])
 
@@ -271,7 +272,6 @@ with col_der:
         reiniciar_conversacion()
         st.rerun()
 
-# Espacio después de botones
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ==========================================
@@ -338,7 +338,57 @@ def es_intento_evaluacion(pregunta: str) -> bool:
     return any(palabra in pregunta.lower() for palabra in PALABRAS_EVALUACION)
 
 # ==========================================
-# 12. SYSTEM INSTRUCTION
+# 12. LÓGICA DINÁMICA DE TOKENS
+# ==========================================
+def calcular_max_tokens(pregunta: str) -> int:
+    """
+    Calcula dinámicamente el límite de tokens de salida según la complejidad de la pregunta.
+    """
+    pregunta_lower = pregunta.lower()
+    
+    # Palabras que indican que la pregunta requiere respuesta larga
+    palabras_complejas = [
+        "salario", "prestaciones", "contrato", "despido", "indemnización",
+        "vacaciones", "utilidades", "liquidación", "beneficios", "artículo",
+        "explique", "compare", "diferencia", "procedimiento", "cálculo",
+        "cómo se", "cuál es", "derechos", "obligaciones", "LOTTT", "reglamento"
+    ]
+    
+    # Palabras que indican respuesta corta
+    palabras_cortas = [
+        "qué es", "defina", "significa", "qué significa", "concepto",
+        "brevemente", "resumido", "en una línea", "sí o no", "verdadero", "falso"
+    ]
+    
+    # Bonus por longitud de la pregunta
+    longitud = len(pregunta)
+    
+    # Calcular puntuación
+    puntuacion = 0
+    
+    for palabra in palabras_complejas:
+        if palabra in pregunta_lower:
+            puntuacion += 2
+    
+    for palabra in palabras_cortas:
+        if palabra in pregunta_lower:
+            puntuacion -= 3
+    
+    if longitud > 100:
+        puntuacion += 1
+    if longitud > 200:
+        puntuacion += 1
+    
+    # Decisión basada en puntuación
+    if puntuacion >= 3:
+        return 4096  # Máximo para respuestas complejas
+    elif puntuacion <= -2:
+        return 1024  # Mínimo para respuestas muy cortas
+    else:
+        return 2048  # Intermedio para respuestas normales
+
+# ==========================================
+# 13. SYSTEM INSTRUCTION
 # ==========================================
 def get_system_instruction():
     return f"""
@@ -349,13 +399,14 @@ CONTEXTO DE CÁTEDRA:
 
 REGLAS:
 - Responde con claridad, calidez y rigor jurídico.
-- Máximo 3 párrafos. Usa **negritas** para conceptos clave.
+- Usa **negritas** para conceptos clave.
 - NO ayudas a resolver exámenes o evaluaciones.
-- Cita las fuentes del contexto.
+- Cita las fuentes del contexto cuando las uses.
+- Sé concisa pero completa. Si la pregunta requiere explicación detallada, desarróllala.
 """
 
 # ==========================================
-# 13. INTERFAZ DE CHAT
+# 14. INTERFAZ DE CHAT
 # ==========================================
 for message in st.session_state.messages:
     with st.chat_message(message["role"], avatar=message.get("avatar")):
@@ -375,20 +426,24 @@ if prompt:
         st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
         
         with st.chat_message("assistant", avatar="✨"):
+            # Bloqueo de evaluaciones
             if es_intento_evaluacion(prompt):
-                respuesta = "📚 **Lo siento, no puedo ayudarte con evaluaciones.** Estoy para apoyar tu aprendizaje genuino."
+                respuesta = "📚 **Lo siento, no puedo ayudarte con evaluaciones.** Estoy para apoyar tu aprendizaje genuino. ¿Tienes alguna duda sobre el contenido?"
                 st.markdown(respuesta)
                 st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta})
                 registrar_consulta_dual(prompt, "[BLOQUEADO]")
                 st.stop()
             
+            # Verificar caché
             cache = obtener_cache(prompt)
             if cache:
                 st.markdown(cache)
                 st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": cache})
                 registrar_consulta_dual(prompt, "[CACHÉ]")
+                st.info("⚡ Respuesta recuperada de memoria")
                 st.rerun()
             
+            # Llamar a Gemini
             if not api_key:
                 st.error("Error: API Key no configurada.")
             else:
@@ -399,10 +454,24 @@ if prompt:
                         role = "model" if msg["role"] == "assistant" else "user"
                         history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
                     
+                    # Calcular tokens dinámicamente según la pregunta
+                    max_tokens = calcular_max_tokens(prompt)
+                    
+                    # Mostrar indicador de modo (opcional, para transparencia)
+                    if max_tokens == 4096:
+                        modo = "📖 Modo detallado"
+                    elif max_tokens == 1024:
+                        modo = "📝 Modo conciso"
+                    else:
+                        modo = "📘 Modo estándar"
+                    
+                    # Opcional: mostrar el modo (comentar si no quieres que el estudiante lo vea)
+                    # st.caption(modo)
+                    
                     config = types.GenerateContentConfig(
                         system_instruction=get_system_instruction(),
                         temperature=0.2,
-                        max_output_tokens=1024
+                        max_output_tokens=max_tokens  # ← VALOR DINÁMICO
                     )
                     
                     response = client.models.generate_content(
@@ -418,6 +487,13 @@ if prompt:
                     registrar_consulta_dual(prompt, respuesta_texto)
                     
                 except Exception as e:
-                    error_msg = "📚 Aura está recibiendo muchas consultas. Espera un momento." if "RESOURCE_EXHAUSTED" in str(e) else f"⚠️ Error: {str(e)[:150]}"
-                    st.error(error_msg)
-                    registrar_consulta_dual(prompt, error_msg)
+                    error_str = str(e)
+                    if "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
+                        clean_error = "📚 **Aura está recibiendo muchas consultas en este momento.** Por favor, espera 1 minuto y vuelve a intentar."
+                    elif "quota" in error_str.lower():
+                        clean_error = "📚 **Aura ha alcanzado su límite de consultas por hoy.** El servicio se restablecerá automáticamente."
+                    else:
+                        clean_error = f"⚠️ Error técnico: {error_str[:150]}"
+                    
+                    st.error(clean_error)
+                    registrar_consulta_dual(prompt, clean_error)
