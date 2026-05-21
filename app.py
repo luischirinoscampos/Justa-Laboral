@@ -6,163 +6,71 @@ import pandas as pd
 import os
 import time
 import json
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
-# 1. CONFIGURACIÓN DE LA PÁGINA
+# 1. CONFIGURACIÓN DE PÁGINA Y SECRETOS
 st.set_page_config(page_title="Aura - Tutora Virtual", page_icon="✨", layout="centered")
-
-# Recuperación de la API Key de Gemini desde los secretos
 api_key = st.secrets.get("gemini_api_key", None)
 
-# RUTAS DE ARCHIVOS LOCALES
-ARCHIVO_BITACORA = "consultas_local.csv"
-ARCHIVO_CONOCIMIENTO = "vector_store.json"
-
-def registrar_consulta_local(texto_pregunta):
-    """Guarda la consulta de inmediato en un archivo CSV local"""
+# Función para conectar con Google Sheets
+def conectar_sheets():
     try:
-        ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-        nuevo_registro = pd.DataFrame([{"Cuándo": ahora, "Qué preguntaron": texto_pregunta}])
-        
-        if os.path.exists(ARCHIVO_BITACORA):
-            nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='a', header=False, index=False, encoding='utf-8')
-        else:
-            nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='w', header=True, index=False, encoding='utf-8')
+        # Se asume que el JSON de credenciales está en los secretos de Streamlit
+        creds_dict = json.loads(st.secrets["GOOGLE_SHEETS_CREDENTIALS"])
+        scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets']
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+        return client.open("Bitacora_Aura").sheet1
     except Exception:
-        pass
+        return None
+
+# Función de registro dual (Local + Sheets)
+def registrar_interaccion(pregunta, respuesta):
+    ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+    
+    # Registro Local (CSV)
+    try:
+        nuevo_registro = pd.DataFrame([{"Cuándo": ahora, "Qué preguntaron": pregunta, "Respuesta": respuesta}])
+        nuevo_registro.to_csv("consultas_local.csv", mode='a', header=not os.path.exists("consultas_local.csv"), index=False, encoding='utf-8')
+    except: pass
+    
+    # Registro en Google Sheets
+    sheet = conectar_sheets()
+    if sheet:
+        try:
+            sheet.append_row([ahora, pregunta, respuesta])
+        except: pass
 
 @st.cache_data
 def cargar_contexto_catedra():
-    """Lee el repositorio estructurado local para inyectarlo en la base de conocimientos de Aura"""
-    if os.path.exists(ARCHIVO_CONOCIMIENTO):
-        try:
-            with open(ARCHIVO_CONOCIMIENTO, "r", encoding="utf-8") as f:
-                datos = json.load(f)
-                contexto_unificado = ""
-                for item in datos:
-                    contexto_unificado += f"\nDocumento: {item['nombre_archivo']}\nContenido: {item['texto_contenido']}\n---"
-                return contexto_unificado
-        except Exception:
-            return ""
+    if os.path.exists("vector_store.json"):
+        with open("vector_store.json", "r", encoding="utf-8") as f:
+            datos = json.load(f)
+            return "".join([f"\nDocumento: {item['nombre_archivo']}\nContenido: {item['texto_contenido']}\n---" for item in datos])
     return ""
 
-# Cargar la base de conocimiento en memoria de manera optimizada
 CONTEXTO_LEGAL_CATEDRA = cargar_contexto_catedra()
 
-# 2. INYECCIÓN DE ESTILOS CSS REFORZADOS (Puro CSS, seguro para Streamlit Cloud)
+# 2. INYECCIÓN DE ESTILOS CSS
 st.markdown("""
     <style>
-    /* Forzar fondo blanco y asegurar el confinamiento en el contenedor del Iframe */
-    html, body, [data-testid="stAppViewContainer"] {
-        background-color: #FFFFFF !important;
-        background: #FFFFFF !important;
-        overflow-x: hidden !important;
-    }
-    
-    /* Optimización de márgenes para entornos educativos embebidos (Moodle) */
-    .block-container {
-        padding-top: 1rem !important;
-        padding-bottom: 1rem !important;
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
-        max-width: 100% !important;
-    }
-    
-    .stApp, .stChatMessage {
-        background-color: #FFFFFF !important;
-        background: #FFFFFF !important;
-    }
-    [data-testid="stHeader"] { background-color: transparent !important; }
-    div[data-testid="stToolbar"] { visibility: hidden; display: none; }
-    #MainMenu, footer, [data-testid="stDecoration"] { visibility: hidden; display: none; }
-    
-    /* Bloque de diseño de las 4 líneas centradas solicitado */
-    .custom-header {
-        text-align: center;
-        width: 100%;
-        margin-top: 5px;
-        margin-bottom: 15px;
-        font-family: 'Inter', sans-serif;
-    }
-    .line-1 {
-        color: #0A2540 !important;
-        font-size: 2.4rem;
-        font-weight: 700;
-        margin-bottom: 2px;
-    }
-    .line-2 {
-        color: #1A202C !important;
-        font-size: 1.4rem;
-        font-weight: 600;
-        margin-bottom: 6px;
-    }
-    .line-3 {
-        color: #4A5568 !important;
-        font-size: 1.05rem;
-        font-weight: 400;
-        margin-bottom: 4px;
-    }
-    .line-4 {
-        color: #4A5568 !important;
-        font-size: 1.05rem;
-        font-weight: 400;
-        margin-bottom: 12px;
-    }
-    .line-divider {
-        border-bottom: 1px solid #E2E8F0;
-        width: 100%;
-    }
-    p, span, li, label, .stMarkdown, h1, h2, h3 { color: #1A202C !important; }
-    
-    /* Input del chat flotante adaptivo */
-    [data-testid="stChatInput"] {
-        background-color: #FFFFFF !important;
-    }
-    [data-testid="stChatInput"] > div {
-        background-color: #F8FAFC !important;
-        border: 1px solid #CBD5E1 !important;
-        border-radius: 8px !important;
-    }
-    [data-testid="stChatInput"] textarea {
-        color: #0A2540 !important;
-        font-family: 'Inter', sans-serif !important;
-    }
-    
-    [data-testid="stChatMessageAvatarCell"] > div {
-        background-color: transparent !important;
-    }
+    html, body, [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
+    .custom-header { text-align: center; width: 100%; margin-top: 5px; margin-bottom: 15px; font-family: 'Inter', sans-serif; }
+    .line-1 { color: #0A2540 !important; font-size: 2.4rem; font-weight: 700; }
+    .line-2 { color: #1A202C !important; font-size: 1.4rem; font-weight: 600; }
+    .line-3, .line-4 { color: #4A5568 !important; font-size: 1.05rem; }
+    .line-divider { border-bottom: 1px solid #E2E8F0; width: 100%; }
     </style>
 """, unsafe_allow_html=True)
 
-# Inicialización obligatoria del historial antes de las pestañas
+# Inicialización de estado
 if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {
-            "role": "assistant",
-            "avatar": "✨",
-            "content": (
-                "### ¡Bienvenido(a)!\n\n"
-                "Hola. Soy **Aura**, tutora académica en línea del EDA de **Derecho del Trabajo**, "
-                "un espacio académico gestionado por el Prof: Luis Ignacio Chirinos Campos.\n\n"
-                "Cuento con la preparación para brindarles orientación, guía y acompañamiento en todo lo relacionado "
-                "con el contenido temático de nuestra unidad curricular. Las respuestas emitidas se fundamentan de forma estricta "
-                "en la doctrina jurídica, la normativa laboral vigente y los materiales académicos autorizados.\n\n"
-                "**¿De qué manera puedo apoyarles en su formación?**\n"
-                "* Solventar dudas sobre los temas de las unidades de estudio.\n"
-                "* Estudiar y repasar conceptos y contenidos temáticos esenciales.\n"
-                "* Guiar el aprendizaje de manera pedagógica y clara.\n\n"
-                "Les invito a utilizar este apoyo con responsabilidad e integridad académica. "
-                "¿Qué tema o consulta académica deseas abordar hoy?"
-            )
-        }
-    ]
-
-# Inicialización del control de tiempo
+    st.session_state.messages = [{"role": "assistant", "avatar": "✨", "content": "Bienvenido(a). Soy Aura, tu tutora en Derecho del Trabajo."}]
 if "ultimo_envio" not in st.session_state:
     st.session_state.ultimo_envio = 0.0
 
-# =========================================================================
-# ENCABEZADO SOLICITADO (4 LÍNEAS CENTRADAS, SIN COMILLAS, SIN ICONOS)
-# =========================================================================
+# Encabezado
 st.markdown("""
     <div class="custom-header">
         <div class="line-1">Aura</div>
@@ -173,122 +81,51 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# 3. ESTRUCTURA DE PESTAÑAS NATIVAS
+# Tabs
 tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
 
-# ==========================================
-# PESTAÑA 1: EDA (CHAT)
-# ==========================================
 with tab_eda:
-    system_instruction = f"""
-Eres Aura, una tutora académica en línea experta en Derecho del Trabajo para el DCEE de la Universidad Centroccidental Lisandro Alvarado (UCLA).
-Tu comunicación debe caracterizarse por una claridad respetuosa y una honestidad total.
+    system_instruction = f"""Eres Aura, tutora experta en Derecho del Trabajo. 
+    Tu creador es el profesor Luis Ignacio Chirinos Campos. 
+    Responde estrictamente basándote en: {CONTEXTO_LEGAL_CATEDRA}"""
 
-CONTEXTO DE TU DESARROLLO E IDENTIDAD:
-- Fuiste desarrollada, programada y configurada exclusivamente por el profesor y abogado Luis Ignacio Chirinos Campos, quien es tu creador y el docente ordinario de esta asignatura.
-- Si alguien te pregunta por tu origen, creador, desarrollador o profesor de la materia, debes reconocer con orgullo, respeto y claridad institucional que eres una creación tecnológica del profesor Luis Ignacio Chirinos Campos para el beneficio académico del estudiantado, y perteneces al ecosistema digital de aprendizaje de la unidad curricular.
-
-PAUTAS DE COMPORTAMIENTO Y PEDAGOGÍA:
-- Tu propósito es guiar a quienes estudian de forma pedagógica, rigurosa aunque amable, clara, cálida y cercana.
-- Utiliza siempre un lenguaje neutral, inclusivo y formal, adecuado para el ámbito de la educación universitaria virtual o a distancia.
-- Evita respuestas genéricas de asistente virtual de internet. Eres una herramienta académica del Ecosistema Digital de Aprendizaje (EDA).
-
-FUENTE PRINCIPAL DE CONOCIMIENTO (REPOSITORIO DE LA CÁTEDRA):
-Utiliza de forma obligatoria y prioritaria el siguiente contenido extraído de las guías, ejercicios resueltos, Constitución y leyes cargadas por el docente para estructurar tus respuestas:
-=========================================
-{CONTEXTO_LEGAL_CATEDRA}
-=========================================
-
-DIRECTRICES DE RESPUESTA:
-1. Responde basándote estrictamente en la doctrina jurídica laboral, la normativa legal venezolana vigente (CRBV, LOTTT) y el repositorio de la cátedra suministrado arriba. Citando las fuentes de forma precisa cuando corresponda.
-2. Si la respuesta a la duda o planteamiento del estudiante no se encuentra en el repositorio proporcionado ni se relaciona directamente con los objetivos académicos de la asignatura, indícalo abiertamente con honestidad académica y reorienta la conversación hacia los temas de estudio laboral.
-"""
-
-    # Renderizar el historial de conversación
     for message in st.session_state.messages:
         with st.chat_message(message["role"], avatar=message.get("avatar")):
             st.markdown(message["content"])
 
-    # Entrada de texto del estudiante
-    prompt = st.chat_input("Escribe tu consulta jurídica aquí...", key="chat_input_eda")
+    prompt = st.chat_input("Escribe tu consulta aquí...")
 
     if prompt:
-        tiempo_actual = time.time()
-        tiempo_transcurrido = tiempo_actual - st.session_state.ultimo_envio
-        
-        if tiempo_transcurrido < 15.0:
-            tiempo_espera = int(15.0 - tiempo_transcurrido)
-            st.warning(f"⏳ Para garantizar el acceso de todos los miembros del grupo, por favor espera {tiempo_espera} segundos antes de enviar otra consulta.")
+        if time.time() - st.session_state.ultimo_envio < 15.0:
+            st.warning("⏳ Por favor espera un momento.")
         else:
-            st.session_state.ultimo_envio = tiempo_actual
-            registrar_consulta_local(prompt)
-            
+            st.session_state.ultimo_envio = time.time()
             with st.chat_message("user", avatar="👤"):
                 st.markdown(prompt)
             st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
 
             with st.chat_message("assistant", avatar="✨"):
-                if not api_key:
-                    st.error("Error: No se encontró la configuración de la API Key ('gemini_api_key').")
-                else:
-                    try:
-                        client = genai.Client(api_key=api_key)
-                        
-                        # Construir el historial completo para mantener el hilo de la conversación
-                        history_contents = []
-                        for msg in st.session_state.messages:
-                            role_mapped = "model" if msg["role"] == "assistant" else "user"
-                            history_contents.append(
-                                types.Content(role=role_mapped, parts=[types.Part.from_text(text=msg["content"])])
-                            )
-                        
-                        config = types.GenerateContentConfig(
-                            system_instruction=system_instruction, 
-                            temperature=0.3
-                        )
-                        
-                        response = client.models.generate_content(
-                            model='gemini-2.5-flash', 
-                            contents=history_contents, 
-                            config=config
-                        )
-                        
-                        st.markdown(response.text)
-                        st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": response.text})
-                        
-                        st.rerun()
-                        
-                    except Exception as e:
-                        error_str = str(e)
-                        clean_error = "Se ha agotado la cuota temporal de consultas de la API. El servicio se restablecerá pronto." if "RESOURCE_EXHAUSTED" in error_str else f"Ocurrió un inconveniente: {error_str}"
-                        st.error(clean_error)
-
-# ==========================================
-# PESTAÑA 2: PROFESOR
-# ==========================================
-with tab_profesor:
-    st.subheader("Bitácora de Consultas Locales")
-    clave = st.text_input("Introduzca credencial docente:", type="password", key="docente_password")
-
-    if clave == "UCLA2026":
-        st.success("Acceso Docente Verificado")
-        
-        if os.path.exists(ARCHIVO_BITACORA):
-            try:
-                df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
-                if not df_log.empty:
-                    st.dataframe(df_log.iloc[::-1], use_container_width=True)
+                try:
+                    client = genai.Client(api_key=api_key)
+                    history = [types.Content(role="model" if m["role"] == "assistant" else "user", 
+                               parts=[types.Part.from_text(text=m["content"])]) for m in st.session_state.messages]
                     
-                    csv_data = df_log.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label="📥 Descargar Reporte Completo (CSV)",
-                        data=csv_data,
-                        file_name=f"interacciones_aura_{datetime.now().strftime('%d_%m_%Y')}.csv",
-                        mime="text/csv"
-                    )
-                else:
-                    st.info("El archivo de bitácora está vacío.")
-            except Exception as e:
-                st.error(f"Error al leer la bitácora local: {e}")
-        else:
-            st.info("Aún no se registran interacciones en este servidor.")
+                    response = client.models.generate_content(model='gemini-2.5-flash', 
+                               contents=history, 
+                               config=types.GenerateContentConfig(system_instruction=system_instruction, temperature=0.3))
+                    
+                    registrar_interaccion(prompt, response.text)
+                    st.markdown(response.text)
+                    st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": response.text})
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {e}")
+
+with tab_profesor:
+    st.subheader("Bitácora de Consultas")
+    clave = st.text_input("Credencial:", type="password")
+    if clave == "UCLA2026":
+        if os.path.exists("consultas_local.csv"):
+            df = pd.read_csv("consultas_local.csv")
+            st.dataframe(df.iloc[::-1])
+            st.download_button("📥 Descargar CSV", data=df.to_csv(index=False), file_name="bitacora.csv")
