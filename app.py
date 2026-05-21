@@ -166,7 +166,7 @@ st.markdown("""
         <div class="line-1">Aura</div>
         <div class="line-2">Tutora Académica en Línea</div>
         <div class="line-3">Unidad Curricular: Derecho del Trabajo</div>
-        <div class="line-4">Desarrollador: Ecosistema Digital de Aprendizaje</div>
+        <div class="line-4">Desarrollador: Luis Ignacio Chirinos Campos</div>
         <div class="line-divider"></div>
     </div>
 """, unsafe_allow_html=True)
@@ -177,5 +177,60 @@ tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
 # PESTAÑA 1: EDA (INTERFAZ DE CONSULTAS)
 # ==========================================
 with tab_eda:
-    system_instruction = f"""
-Eres Aura, una tutora académica en línea experta en Derecho del Trabajo para la
+    # CORRECCIÓN DE SINTAXIS: Se eliminan las llaves conflictivas del f-string utilizando concatenación limpia
+    system_instruction = (
+        "Eres Aura, una tutora académica en línea experta en Derecho del Trabajo para la Universidad Centroccidental Lisandro Alvarado (UCLA).\n"
+        "Tu comunicación debe caracterizarse por una claridad respetuosa y una honestidad total.\n\n"
+        "PAUTAS DE COMPORTAMIENTO Y PEDAGOGÍA:\n"
+        "- Tu propósito es guiar de forma pedagógica, rigurosa aunque amable, clara, cálida y cercana.\n"
+        "- Utiliza siempre un lenguaje neutral, inclusivo y formal, adecuado para el ámbito de la educación universitaria virtual o a distancia.\n\n"
+        "FUENTE PRINCIPAL DE CONOCIMIENTO (REPOSITORIO DE LA CÁTEDRA):\n"
+        "=========================================\n"
+        + str(CONTEXTO_LEGAL_CATEDRA) +
+        "\n=========================================\n"
+    )
+
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"], avatar=message.get("avatar")):
+            st.markdown(message["content"])
+
+    prompt = st.chat_input("Escribe tu consulta jurídica aquí...", key="chat_input_eda")
+
+    if prompt:
+        tiempo_actual = time.time()
+        tiempo_transcurrido = tiempo_actual - st.session_state.ultimo_envio
+        
+        if tiempo_transcurrido < 15.0:
+            tiempo_espera = int(15.0 - tiempo_transcurrido)
+            st.warning(f"⏳ Por favor espera {tiempo_espera} segundos antes de enviar otra consulta.")
+        else:
+            st.session_state.ultimo_envio = tiempo_actual
+            
+            with st.chat_message("user", avatar="👤"):
+                st.markdown(prompt)
+            st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
+
+            with st.chat_message("assistant", avatar="✨"):
+                respuesta_texto = ""
+                
+                if not api_key:
+                    respuesta_texto = "ERROR: Configuración de API Key ausente."
+                    st.error(respuesta_texto)
+                else:
+                    # AISLAMIENTO ESTRICTO DE LA LLAMADA A LA API DE GEMINI
+                    try:
+                        client = genai.Client(api_key=api_key)
+                        history_contents = []
+                        for msg in st.session_state.messages:
+                            role_mapped = "model" if msg["role"] == "assistant" else "user"
+                            history_contents.append(
+                                types.Content(role=role_mapped, parts=[types.Part.from_text(text=msg["content"])])
+                            )
+                        
+                        config = types.GenerateContentConfig(system_instruction=system_instruction, temperature=0.3)
+                        response = client.models.generate_content(model='gemini-2.5-flash', contents=history_contents, config=config)
+                        respuesta_texto = response.text
+                        
+                    except Exception as e:
+                        error_str = str(e)
+                        if "RESOURCE_EXHAUSTED" in error_str or "4
