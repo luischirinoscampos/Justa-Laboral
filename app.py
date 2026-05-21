@@ -30,11 +30,11 @@ def reiniciar_conversacion():
             "role": "assistant",
             "avatar": "✨",
             "content": (
-                "🎉 ¡Hola! Soy **Aura**, tu tutora académica en Derecho del Trabajo.\n\n"
+                "📍 ¡Hola! Soy **Aura**, tu tutora académica en Derecho del Trabajo.\n\n"
                 "Pertenezco al **Ecosistema Digital de Aprendizaje (EDA)** de esta unidad curricular, "
                 "creada y desarrollada por el **Prof. Luis Ignacio Chirinos Campos**.\n\n"
                 "Estoy aquí para acompañarte en tu **aprendizaje** con claridad, calidez y rigor jurídico.\n\n"
-                "🔑 **¿Qué puedo hacer por ti?**\n"
+                "🛠️ **¿Qué puedo hacer por ti?**\n"
                 "- Resolver dudas sobre los contenidos de la unidad\n"
                 "- Explicar conceptos jurídicos complejos de forma sencilla\n"
                 "- Ayudarte a preparar tus estudios\n"
@@ -189,16 +189,17 @@ st.markdown("""
         border-radius: 12px !important;
     }
     
-    /* Fila de botones */
-    .botones-fila {
+    /* Contenedor de botones en fila */
+    .botonera {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 15px;
+        margin-bottom: 20px;
+        width: 100%;
     }
     
-    /* Botón de profesor (izquierda) - solo icono */
-    .profesor-btn button {
+    /* Botón de profesor (izquierda) */
+    .btn-profesor button {
         background-color: transparent !important;
         color: #4A5568 !important;
         font-size: 1.3rem !important;
@@ -206,15 +207,16 @@ st.markdown("""
         box-shadow: none !important;
         border: 1px solid #CBD5E1 !important;
         min-width: auto !important;
+        border-radius: 8px !important;
     }
-    .profesor-btn button:hover {
+    .btn-profesor button:hover {
         color: #0A2540 !important;
         background-color: #F8FAFC !important;
         border-color: #0A2540 !important;
     }
     
-    /* Botón de reinicio (derecha) - solo icono */
-    .reinicio-btn button {
+    /* Botón de reinicio (derecha) */
+    .btn-reinicio button {
         background-color: transparent !important;
         color: #4A5568 !important;
         font-size: 1.3rem !important;
@@ -222,8 +224,9 @@ st.markdown("""
         box-shadow: none !important;
         border: 1px solid #CBD5E1 !important;
         min-width: auto !important;
+        border-radius: 8px !important;
     }
-    .reinicio-btn button:hover {
+    .btn-reinicio button:hover {
         color: #0A2540 !important;
         background-color: #F8FAFC !important;
         border-color: #0A2540 !important;
@@ -265,11 +268,23 @@ if "profesor_autenticado" not in st.session_state:
     st.session_state.profesor_autenticado = False
 
 # ==========================================
-# 9. FILA DE BOTONES (SOLO ICONOS)
+# 9. FILA DE BOTONES (EXTREMO IZQUIERDO Y EXTREMO DERECHO)
 # ==========================================
-col_izq, col_der = st.columns([1, 1])
+# Usamos HTML para posicionar los botones en extremos opuestos
+st.markdown("""
+    <div class="botonera">
+        <div class="btn-profesor" id="profesor-btn">🔒</div>
+        <div class="btn-reinicio" id="reinicio-btn">🔄</div>
+    </div>
+""", unsafe_allow_html=True)
+
+# Pero Streamlit no permite capturar clics de HTML puro, así que usamos columnas
+# con pesos extremos: col1 (muy pequeña) y col3 (muy pequeña), col2 (espacio vacío)
+
+col_izq, col_espacio, col_der = st.columns([1, 10, 1])
+
 with col_izq:
-    st.markdown('<div class="profesor-btn">', unsafe_allow_html=True)
+    st.markdown('<div class="btn-profesor">', unsafe_allow_html=True)
     if st.button("🔒", key="btn_profesor", help="Acceso profesor"):
         st.session_state.show_profesor = not st.session_state.show_profesor
         st.session_state.profesor_autenticado = False
@@ -277,7 +292,7 @@ with col_izq:
     st.markdown('</div>', unsafe_allow_html=True)
 
 with col_der:
-    st.markdown('<div class="reinicio-btn">', unsafe_allow_html=True)
+    st.markdown('<div class="btn-reinicio">', unsafe_allow_html=True)
     if st.button("🔄", key="btn_reinicio", help="Reiniciar conversación"):
         reiniciar_conversacion()
         st.rerun()
