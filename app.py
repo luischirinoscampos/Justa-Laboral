@@ -168,12 +168,6 @@ st.markdown("""
         border-color: #0A2540 !important;
     }
     
-    /* Columna derecha: alinear contenido a la derecha */
-    div[data-testid="column"]:last-child {
-        display: flex;
-        justify-content: flex-end;
-    }
-    
     #MainMenu, footer, header, [data-testid="stToolbar"] {
         visibility: hidden !important;
         display: none !important;
@@ -217,10 +211,11 @@ if "profesor_autenticado" not in st.session_state:
     st.session_state.profesor_autenticado = False
 
 # ==========================================
-# 9. BOTONES SUPERIORES (EN EXTREMOS CON MISMO TAMAÑO)
+# 9. BOTONES SUPERIORES (EN EXTREMOS CON TRES COLUMNAS)
 # ==========================================
-# Usamos columnas: izquierda (1) y derecha (20) con alineación a la derecha
-col_izq, col_der = st.columns([1, 20])
+# Usamos tres columnas: izquierda (1), centro (18), derecha (1)
+# Esto fuerza el botón izquierdo a la izquierda y el derecho a la derecha
+col_izq, col_centro, col_der = st.columns([1, 18, 1])
 
 with col_izq:
     if st.button("🔒", key="btn_profesor", help="Acceso profesor"):
@@ -236,6 +231,8 @@ with col_der:
     if st.button("🔄", key="btn_reinicio", help="Reiniciar conversación"):
         reiniciar_conversacion()
         st.rerun()
+
+# La columna centro queda vacía (solo para empujar los botones a los extremos)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -372,7 +369,6 @@ else:
     st.markdown("## 📋 Panel del Profesor")
     
     if not st.session_state.profesor_autenticado:
-        # Solicitar credenciales de forma discreta
         clave = st.text_input("Credencial docente:", type="password", key="profesor_clave")
         if clave:
             if clave == "UCLA2026":
@@ -382,14 +378,12 @@ else:
             else:
                 st.error("❌ Credencial incorrecta")
         
-        # Botón para volver al chat
         if st.button("← Volver al chat", key="volver_chat"):
             st.session_state.modo_profesor = False
             st.session_state.profesor_autenticado = False
             st.rerun()
     
     else:
-        # Mostrar métricas
         st.markdown("### 📊 Bitácora de Consultas")
         
         if os.path.exists(ARCHIVO_BITACORA):
@@ -402,7 +396,7 @@ else:
                     st.download_button(
                         label="📥 Descargar bitácora (CSV)",
                         data=csv_data,
-                        file_name=f"aura_bitacora_{datetime.now().strftime('%d_%m_%Y_%H%M')}.csv",
+                        file_name=f"aura_bitacora_{datetime.now().strftime('%d_m_%Y_%H%M')}.csv",
                         mime="text/csv"
                     )
                     
