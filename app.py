@@ -25,7 +25,6 @@ NOMBRE_HOJA_SHEETS = "Bitacora_Aura"
 # 2. FUNCIÓN PARA REINICIAR CONVERSACIÓN
 # ==========================================
 def reiniciar_conversacion():
-    """Limpia el historial y restaura el mensaje de bienvenida"""
     st.session_state.messages = [
         {
             "role": "assistant",
@@ -40,8 +39,7 @@ def reiniciar_conversacion():
                 "- Explicar conceptos jurídicos complejos de forma sencilla\n"
                 "- Ayudarte a preparar tus estudios\n"
                 "- Orientarte en casos prácticos\n\n"
-                "⚠️ **Importante**: No puedo ayudarte a resolver exámenes o evaluaciones. "
-                "Mi propósito es apoyar tu **aprendizaje genuino**, no proporcionar atajos académicos.\n\n"
+                "⚠️ **Importante**: No puedo ayudarte a resolver exámenes o evaluaciones.\n\n"
                 "Cuéntame, ¿qué tema o consulta académica te trae hoy? 💬"
             )
         }
@@ -66,7 +64,7 @@ def guardar_cache(pregunta: str, respuesta: str):
     CACHE_RESPUESTAS[clave] = respuesta
 
 # ==========================================
-# 4. CARGA INTELIGENTE DEL CONOCIMIENTO
+# 4. CARGA DEL CONOCIMIENTO
 # ==========================================
 @st.cache_data
 def cargar_contexto_catedra():
@@ -138,116 +136,66 @@ def registrar_consulta_dual(texto_pregunta, respuesta_o_error):
         pass
 
 # ==========================================
-# 6. ESTILOS CSS (FORZADO: fondo blanco absoluto)
+# 6. ESTILOS CSS (fondo blanco total)
 # ==========================================
 st.markdown("""
     <style>
-    /* === FORZAR FONDO BLANCO EN TODO === */
+    /* Fondo blanco absoluto */
     html, body, .stApp, .stAppViewContainer, .main, .block-container,
-    [data-testid="stAppViewContainer"],
-    [data-testid="stAppViewBlockContainer"],
-    [data-testid="stVerticalBlock"],
-    [data-testid="stHorizontalBlock"],
-    .element-container,
-    .stMarkdown,
-    .stChatMessage,
-    [data-testid="stChatMessage"],
-    [data-testid="stChatMessageContent"],
-    [data-testid="stChatInput"],
-    [data-testid="stChatInputTextArea"],
-    div[data-testid="stChatMessage"] {
+    [data-testid="stAppViewContainer"], .stChatMessage,
+    [data-testid="stChatMessage"], [data-testid="stChatMessageContent"] {
         background-color: #FFFFFF !important;
         background: #FFFFFF !important;
     }
     
-    /* === FORZAR TEXTO AZUL OSCURO === */
-    p, span, li, label, .stMarkdown, h1, h2, h3, h4, h5, h6,
-    .stChatMessage, div, .stTextInput > div > div > input,
-    [data-testid="stChatMessage"] p,
-    [data-testid="stChatMessage"] span {
+    /* Texto azul oscuro */
+    p, span, li, label, .stMarkdown, h1, h2, h3, h4, div {
         color: #0A2540 !important;
     }
     
-    /* === ENCABEZADO === */
+    /* Encabezado */
     .custom-header {
         text-align: center;
-        margin-bottom: 20px;
-        padding-bottom: 5px;
-        border-bottom: 1px solid #E2E8F0;
-        width: 100%;
-        background-color: #FFFFFF !important;
+        margin-bottom: 25px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #0A2540;
     }
     .line-1 {
-        color: #0A2540 !important;
-        font-size: 2.4rem;
+        font-size: 2.5rem;
         font-weight: 700;
-        margin-bottom: 2px;
+        color: #0A2540 !important;
     }
     .line-2 {
-        color: #1A202C !important;
-        font-size: 1.4rem;
+        font-size: 1.2rem;
         font-weight: 600;
-        margin-bottom: 4px;
+        color: #1A3A5C !important;
     }
     .line-3 {
+        font-size: 0.95rem;
         color: #4A5568 !important;
-        font-size: 1rem;
-        font-weight: 400;
-        margin-bottom: 4px;
     }
     .line-4 {
+        font-size: 0.85rem;
         color: #4A5568 !important;
-        font-size: 0.9rem;
-        font-weight: 400;
-        margin-bottom: 8px;
-    }
-    .line-divider {
-        border-bottom: 1px solid #E2E8F0;
-        width: 100%;
+        margin-top: 5px;
     }
     
-    /* === INPUT DEL CHAT === */
+    /* Input del chat */
     [data-testid="stChatInput"] > div {
         background-color: #F8FAFC !important;
         border: 1px solid #CBD5E1 !important;
         border-radius: 12px !important;
     }
-    [data-testid="stChatInput"] textarea {
-        color: #0A2540 !important;
-        background-color: #F8FAFC !important;
-    }
     
-    /* === BOTONES === */
+    /* Botón de reinicio */
     .stButton > button {
         background-color: #0A2540 !important;
         color: white !important;
         border-radius: 8px !important;
-        border: none !important;
-    }
-    .stButton > button:hover {
-        background-color: #1A3A5C !important;
     }
     
-    /* === PESTAÑAS === */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background-color: #F8FAFC;
-        padding: 8px;
-        border-radius: 12px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 8px;
-        padding: 8px 16px;
-        background-color: transparent;
-        color: #0A2540 !important;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #0A2540 !important;
-        color: white !important;
-    }
-    
-    /* === OCULTAR ELEMENTOS DE STREAMLIT === */
-    #MainMenu, footer, header, [data-testid="stToolbar"], [data-testid="stDecoration"] {
+    /* Ocultar elementos */
+    #MainMenu, footer, header, [data-testid="stToolbar"] {
         visibility: hidden !important;
         display: none !important;
     }
@@ -263,7 +211,6 @@ st.markdown("""
         <div class="line-2">Tutora Académica en Línea</div>
         <div class="line-3">Unidad Curricular: Derecho del Trabajo</div>
         <div class="line-4">Desarrollador: Prof. Luis Ignacio Chirinos Campos</div>
-        <div class="line-divider"></div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -301,106 +248,113 @@ REGLAS:
 - Responde con claridad, calidez y rigor jurídico.
 - Máximo 3 párrafos. Usa **negritas** para conceptos clave.
 - NO ayudas a resolver exámenes o evaluaciones.
-- Si la pregunta es un intento de obtener respuestas de examen, recházala educadamente.
-- Cita las fuentes del contexto cuando las uses.
+- Cita las fuentes del contexto.
 """
 
 # ==========================================
-# 11. PESTAÑAS
+# 11. INTERFAZ DE CHAT (sin pestañas visibles)
 # ==========================================
-tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
+# Botón de reinicio
+col1, col2 = st.columns([6, 1])
+with col2:
+    if st.button("🔄", help="Reiniciar conversación"):
+        reiniciar_conversacion()
+        st.rerun()
+
+# Mostrar mensajes
+for message in st.session_state.messages:
+    with st.chat_message(message["role"], avatar=message.get("avatar")):
+        st.markdown(message["content"])
+
+# Input del chat
+prompt = st.chat_input("Escribe tu consulta jurídica aquí...")
+
+if prompt:
+    tiempo_actual = time.time()
+    if tiempo_actual - st.session_state.ultimo_envio < 15:
+        st.warning(f"⏳ Espera {int(15 - (tiempo_actual - st.session_state.ultimo_envio))} segundos.")
+    else:
+        st.session_state.ultimo_envio = tiempo_actual
+        
+        with st.chat_message("user", avatar="👤"):
+            st.markdown(prompt)
+        st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
+        
+        with st.chat_message("assistant", avatar="✨"):
+            # Bloqueo de evaluaciones
+            if es_intento_evaluacion(prompt):
+                respuesta = "📚 **Lo siento, no puedo ayudarte con evaluaciones.** Estoy para apoyar tu aprendizaje genuino. ¿Tienes alguna duda sobre el contenido?"
+                st.markdown(respuesta)
+                st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta})
+                registrar_consulta_dual(prompt, "[BLOQUEADO]")
+                st.stop()
+            
+            # Verificar caché
+            cache = obtener_cache(prompt)
+            if cache:
+                st.markdown(cache)
+                st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": cache})
+                registrar_consulta_dual(prompt, "[CACHÉ]")
+                st.rerun()
+            
+            # Llamar a Gemini
+            if not api_key:
+                st.error("Error: API Key no configurada.")
+            else:
+                try:
+                    client = genai.Client(api_key=api_key)
+                    history = []
+                    for msg in st.session_state.messages[-4:]:
+                        role = "model" if msg["role"] == "assistant" else "user"
+                        history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
+                    
+                    config = types.GenerateContentConfig(
+                        system_instruction=get_system_instruction(),
+                        temperature=0.2,
+                        max_output_tokens=1024
+                    )
+                    
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=history,
+                        config=config
+                    )
+                    
+                    respuesta_texto = response.text
+                    st.markdown(respuesta_texto)
+                    st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta_texto})
+                    guardar_cache(prompt, respuesta_texto)
+                    registrar_consulta_dual(prompt, respuesta_texto)
+                    
+                except Exception as e:
+                    error_msg = "📚 Aura está recibiendo muchas consultas. Espera un momento." if "RESOURCE_EXHAUSTED" in str(e) else f"⚠️ Error: {str(e)[:150]}"
+                    st.error(error_msg)
+                    registrar_consulta_dual(prompt, error_msg)
 
 # ==========================================
-# 12. PESTAÑA EDA
+# 12. ACCESO OCULTO PARA EL PROFESOR (URL secreta)
 # ==========================================
-with tab_eda:
-    col1, col2 = st.columns([6, 1])
-    with col2:
-        if st.button("🔄", help="Reiniciar"):
-            reiniciar_conversacion()
-            st.rerun()
-    
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"], avatar=message.get("avatar")):
-            st.markdown(message["content"])
-    
-    prompt = st.chat_input("Escribe tu consulta...")
-    
-    if prompt:
-        if time.time() - st.session_state.ultimo_envio < 15:
-            st.warning("⏳ Espera 15 segundos.")
-        else:
-            st.session_state.ultimo_envio = time.time()
-            
-            with st.chat_message("user", avatar="👤"):
-                st.markdown(prompt)
-            st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
-            
-            with st.chat_message("assistant", avatar="✨"):
-                if es_intento_evaluacion(prompt):
-                    respuesta = "📚 **Lo siento, no puedo ayudarte con evaluaciones.** Estoy para apoyar tu aprendizaje."
-                    st.markdown(respuesta)
-                    st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta})
-                    registrar_consulta_dual(prompt, "[BLOQUEADO]")
-                    st.stop()
-                
-                cache = obtener_cache(prompt)
-                if cache:
-                    st.markdown(cache)
-                    st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": cache})
-                    registrar_consulta_dual(prompt, "[CACHÉ]")
-                    st.rerun()
-                
-                if not api_key:
-                    st.error("Error: API Key no configurada.")
-                else:
-                    try:
-                        client = genai.Client(api_key=api_key)
-                        history = []
-                        for msg in st.session_state.messages[-4:]:
-                            role = "model" if msg["role"] == "assistant" else "user"
-                            history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
-                        
-                        config = types.GenerateContentConfig(
-                            system_instruction=get_system_instruction(),
-                            temperature=0.2,
-                            max_output_tokens=1024
-                        )
-                        
-                        response = client.models.generate_content(
-                            model='gemini-2.5-flash',
-                            contents=history,
-                            config=config
-                        )
-                        
-                        respuesta_texto = response.text
-                        st.markdown(respuesta_texto)
-                        st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta_texto})
-                        guardar_cache(prompt, respuesta_texto)
-                        registrar_consulta_dual(prompt, respuesta_texto)
-                        
-                    except Exception as e:
-                        error_msg = "📚 Aura está recibiendo muchas consultas. Espera un momento." if "RESOURCE_EXHAUSTED" in str(e) else f"⚠️ Error: {str(e)[:150]}"
-                        st.error(error_msg)
-                        registrar_consulta_dual(prompt, error_msg)
+# Para ver la bitácora, añade "?admin=true" al final de la URL
+# Ejemplo: https://tu-app.streamlit.app/?admin=true
 
-# ==========================================
-# 13. PESTAÑA PROFESOR
-# ==========================================
-with tab_profesor:
-    st.subheader("Bitácora de Consultas")
-    clave = st.text_input("Credencial docente:", type="password")
+import urllib.parse
+query_params = st.query_params
+
+if query_params.get("admin") == ["true"]:
+    st.markdown("---")
+    st.subheader("📋 Panel del Profesor")
+    clave = st.text_input("Credencial:", type="password")
     
     if clave == "UCLA2026":
-        st.success("Acceso Verificado")
+        st.success("Acceso concedido")
         if os.path.exists(ARCHIVO_BITACORA):
             df = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
             if not df.empty:
-                st.dataframe(df.iloc[::-1])
-                st.download_button("Descargar CSV", df.to_csv(index=False).encode('utf-8'), "bitacora.csv")
+                st.dataframe(df.iloc[::-1], use_container_width=True)
+                st.download_button("📥 Descargar CSV", df.to_csv(index=False).encode('utf-8'), "bitacora.csv")
             else:
-                st.info("Sin registros.")
+                st.info("Sin registros")
         else:
-            st.info("Sin registros.")
+            st.info("Sin registros")
     elif clave:
         st.error("Credencial incorrecta")
