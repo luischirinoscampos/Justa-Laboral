@@ -6,9 +6,6 @@ import pandas as pd
 import os
 import time
 import json
-import re
-from collections import Counter
-import math
 import csv
 
 # 1. CONFIGURACIÓN DE LA PÁGINA
@@ -22,91 +19,43 @@ ARCHIVO_BITACORA = "consultas_local.csv"
 ARCHIVO_CONOCIMIENTO = "vector_store.json"
 
 def registrar_consulta_local(texto_pregunta, texto_respuesta=""):
-    """Guarda la consulta y la respuesta de Aura encapsulándolas con comillas de seguridad en el CSV"""
+    """Guarda de forma estricta la consulta y la respuesta en el CSV de 3 columnas"""
     try:
         ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
         nuevo_registro = pd.DataFrame([{
             "Cuándo": ahora, 
-            "Qué preguntaron": texto_pregunta,
+            "Qué preguntaron": texto_pregunta, 
             "Respuesta de Aura": texto_respuesta
         }])
         
-        # Forzar orden estricto de las tres columnas fijas
+        # Forzar el orden correcto de los campos
         nuevo_registro = nuevo_registro[["Cuándo", "Qué preguntaron", "Respuesta de Aura"]]
         
         if os.path.exists(ARCHIVO_BITACORA):
-            # Se añade al final protegiendo textos con caracteres especiales o comas
+            # Se añade al final protegiendo los textos con comillas para evitar rupturas por comas
             nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='a', header=False, index=False, encoding='utf-8', quoting=csv.QUOTE_MINIMAL)
         else:
             nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='w', header=True, index=False, encoding='utf-8', quoting=csv.QUOTE_MINIMAL)
     except Exception:
         pass
 
-# =========================================================================
-# MOTOR DE BÚSQUEDA SEMÁNTICA (RAG LOCAL) - OPCIÓN 2
-# =========================================================================
-def limpiar_y_tokenizar(texto):
-    """Limpia el texto y lo divide en palabras significativas"""
-    texto = texto.lower()
-    re_limpieza = re.compile(r'[^\w\s]')
-    texto = re_limpieza.sub(' ', texto)
-    palabras = texto.split()
-    stopwords = {'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'de', 'del', 'en', 'para', 'por', 'con', 'y', 'o', 'que', 'su', 'sus', 'al'}
-    return [p for p in palabras if p not in stopwords and len(p) > 2]
-
-def calcular_similitud_texto(texto1, texto2):
-    """Calcula la similitud de coseno matemática básica entre dos textos"""
-    palabras1 = limpiar_y_tokenizar(texto1)
-    palabras2 = limpiar_y_tokenizar(texto2)
-    
-    if not palabras1 or not palabras2:
-        return 0.0
-        
-    vec1 = Counter(palabras1)
-    vec2 = Counter(palabras2)
-    
-    interseccion = set(vec1.keys()) & set(vec2.keys())
-    numerador = sum([vec1[x] * vec2[x] for x in interseccion])
-    
-    suma1 = sum([vec1[x]**2 for x in vec1.keys()])
-    suma2 = sum([vec2[x]**2 for x in vec2.keys()])
-    denominador = math.sqrt(suma1) * math.sqrt(suma2)
-    
-    if not denominador:
-        return 0.0
-    else:
-        return float(numerador) / denominador
-
-def buscar_contexto_relevante(pregunta_usuario, top_n=3):
-    """Busca y extrae únicamente los fragmentos del JSON que guardan relación con la pregunta"""
-    if not os.path.exists(ARCHIVO_CONOCIMIENTO):
-        return ""
-    
-    try:
-        with open(ARCHIVO_CONOCIMIENTO, "r", encoding="utf-8") as f:
-            datos = json.load(f)
-            
-        puntuaciones = []
-        for item in datos:
-            contenido = item.get('texto_contenido', '')
-            nombre_archivo = item.get('nombre_archivo', 'Documento sin nombre')
-            
-            score = calcular_similitud_texto(pregunta_usuario, contenido)
-            puntuaciones.append((score, nombre_archivo, contenido))
-            
-        puntuaciones.sort(key=lambda x: x[0], reverse=True)
-        fragmentos_seleccionados = [p for p in puntuaciones[:top_n] if p[0] > 0.0]
-        
-        if not fragmentos_seleccionados:
+@st.cache_data
+def cargar_contexto_catedra():
+    """Lee el repositorio estructurado local para inyectarlo en la base de conocimientos de Aura"""
+    if os.path.exists(ARCHIVO_CONOCIMIENTO):
+        try:
+            with open(ARCHIVO_CONOCIMIENTO, "r", encoding="utf-8") as f:
+                datos = json.load(f)
+                contexto_unificado = ""
+                for item in datos:
+                    contexto_unificado += f"\nDocumento: {item['nombre_archivo']}\nContenido: {item['texto_contenido']}\n---"
+                return contexto_unificado
+        except Exception:
             return ""
-            
-        contexto_filtrado = ""
-        for score, archivo, contenido in fragmentos_seleccionados:
-            contexto_filtrado += f"\nDocumento: {archivo}\nContenido: {contenido}\n---"
-            
-        return contexto_filtrado
-    except Exception:
-        return ""
+    return ""
+
+# Cargar la base de conocimiento en memoria de manera optimizada
+CONTEXTO_LEGAL_CATEDRA = cargar_contexto_catedra()
 
 # 2. INYECCIÓN DE ESTILOS CSS REFORZADOS
 st.markdown("""
@@ -152,7 +101,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Inicialización del historial
+# Inicialización obligatoria del historial antes de las pestañas
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {
@@ -189,12 +138,37 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
+# 3. ESTRUCTURA DE PESTAÑAS NATIVAS
 tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
 
 # ==========================================
 # PESTAÑA 1: EDA (CHAT)
 # ==========================================
 with tab_eda:
+    system_instruction = f"""
+Eres Aura, una tutora académica en línea experta en Derecho del Trabajo para el DCEE de la Universidad Centroccidental Lisandro Alvarado (UCLA).
+Tu comunicación debe caracterizarse por una claridad respetuosa y una honestidad total.
+
+CONTEXTO DE TU DESARROLLO E IDENTIDAD:
+- Fuiste desarrollada, programada y configurada exclusivamente por el profesor y abogado Luis Ignacio Chirinos Campos, quien es tu creador y el docente ordinario de esta asignatura.
+- Si alguien te pregunta por tu origen, creador, desarrollador o profesor de la materia, debes reconocer con orgullo, respeto y claridad institucional que eres una creación tecnológica del profesor Luis Ignacio Chirinos Campos para el beneficio académico del estudiantado, y perteneces al ecosistema digital de aprendizaje de la unidad curricular.
+
+PAUTAS DE COMPORTAMIENTO Y PEDAGOGÍA:
+- Tu propósito es guiar a quienes estudian de forma pedagógica, rigurosa aunque amable, clara, cálida y cercana.
+- Utiliza siempre un lenguaje neutral, inclusivo y formal, adecuado para el ámbito de la educación universitaria virtual o a distancia.
+- Evita respuestas genéricas de asistente virtual de internet. Eres una herramienta académica del Ecosistema Digital de Aprendizaje (EDA).
+
+FUENTE PRINCIPAL DE CONOCIMIENTO (REPOSITORIO DE LA CÁTEDRA):
+Utiliza de forma obligatoria y prioritaria el siguiente contenido extraído de las guías, ejercicios resueltos, Constitución y leyes cargadas por el docente para estructurar tus respuestas:
+=========================================
+{CONTEXTO_LEGAL_CATEDRA}
+=========================================
+
+DIRECTRICES DE RESPUESTA:
+1. Responde basándote estrictamente en la doctrina jurídica laboral, la normativa legal venezolana vigente (CRBV, LOTTT) y el repositorio de la cátedra suministrado arriba. Citando las fuentes de forma precisa cuando corresponda.
+2. Si la respuesta a la duda o planteamiento del estudiante no se encuentra en el repositorio proporcionado ni se relaciona directamente con los objetivos académicos de la asignatura, indícalo abiertamente con honestidad académica y reorienta la conversación hacia los temas de estudio laboral.
+"""
+
     for message in st.session_state.messages:
         with st.chat_message(message["role"], avatar=message.get("avatar")):
             st.markdown(message["content"])
@@ -221,31 +195,6 @@ with tab_eda:
                 else:
                     try:
                         client = genai.Client(api_key=api_key)
-                        contexto_acotado = buscar_contexto_relevante(prompt, top_n=3)
-                        
-                        system_instruction = f"""
-Eres Aura, una tutora académica en línea experta en Derecho del Trabajo para el DCEE de la Universidad Centroccidental Lisandro Alvarado (UCLA).
-Tu comunicación debe caracterizarse por una claridad respetuosa y una honestidad total.
-
-CONTEXTO DE TU DESARROLLO E IDENTIDAD:
-- Fuiste desarrollada, programada y configurada exclusivamente por el profesor y abogado Luis Ignacio Chirinos Campos, quien es tu creador y el docente ordinario de esta asignatura.
-- Si alguien te pregunta por tu origen, creador, desarrollador o profesor de la materia, debes reconocer con orgullo, respeto y claridad institucional que eres una creación tecnológica del profesor Luis Ignacio Chirinos Campos para el beneficio académico del estudiantado, y perteneces al ecosistema digital de aprendizaje de la unidad curricular.
-
-PAUTAS DE COMPORTAMIENTO Y PEDAGOGÍA:
-- Tu propósito es guiar a quienes estudian de forma pedagógica, rigurosa aunque amable, clara, cálida y cercana.
-- Utiliza siempre un lenguaje neutral, inclusivo y formal, adecuado para el ámbito de la educación universitaria virtual o a distancia.
-- Evita respuestas genéricas de asistente virtual de internet. Eres una herramienta académica del Ecosistema Digital de Aprendizaje (EDA).
-
-FUENTE PRINCIPAL DE CONOCIMIENTO (REPOSITORIO ESPECÍFICO EXTRACTADO):
-Utiliza de forma obligatoria y prioritaria el siguiente contenido específico seleccionado por relevancia para estructurar tu respuesta:
-=========================================
-{contexto_acotado}
-=========================================
-
-DIRECTRICES DE RESPUESTA:
-1. Responde basándote estrictamente en la doctrina jurídica laboral, la normativa legal venezolana vigente (CRBV, LOTTT) y el repositorio acotado suministrado arriba. Citando las fuentes de forma precisa cuando corresponda.
-2. Si el fragmento proporcionado arriba no contiene la solución y la duda no se relaciona con los objetivos académicos de la asignatura, indícalo abiertamente con honestidad académica y reorienta la conversación hacia los temas de estudio laboral.
-"""
                         
                         history_contents = []
                         for msg in st.session_state.messages:
@@ -267,7 +216,7 @@ DIRECTRICES DE RESPUESTA:
                         
                         st.markdown(response.text)
                         
-                        # Registro seguro de interacciones
+                        # Registro correcto con los dos textos en sus respectivas columnas
                         registrar_consulta_local(prompt, response.text)
                         
                         st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": response.text})
@@ -290,66 +239,24 @@ with tab_profesor:
         st.success("Acceso Docente Verificado")
         
         if os.path.exists(ARCHIVO_BITACORA):
-            df_log = None
             try:
-                # Intento de lectura estándar usando el parseador nativo de Pandas
-                df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
-                # Si por alguna razón leyó columnas desalineadas, forzamos la corrección de estructura
-                if len(df_log.columns) != 3:
-                    raise ValueError("Estructura de columnas desalineada")
-            except Exception:
-                # LÓGICA DE CONTINGENCIA ROBUSTA: Parsing controlado celda por celda para limpiar filas viejas o corruptas
-                try:
-                    filas_reparadas = []
-                    with open(ARCHIVO_BITACORA, "r", encoding="utf-8", newline="") as f:
-                        lector_csv = csv.reader(f)
-                        cabecera = next(lector_csv, None)
-                        
-                        for fila in lector_csv:
-                            if not fila:
-                                continue
-                            
-                            # Si la fila tiene la estructura correcta de 3 elementos
-                            if len(fila) == 3:
-                                cuando, pregunta, respuesta = fila[0], fila[1], fila[2]
-                            # Si es una fila antigua de 2 elementos
-                            elif len(fila) == 2:
-                                cuando, pregunta, respuesta = fila[0], fila[1], "No registrada (Bitácora anterior)"
-                            # Si la fila se fragmentó de más debido a las comas sueltas históricas
-                            elif len(fila) > 3:
-                                cuando = fila[0]
-                                pregunta = fila[1]
-                                # Recomponer el remanente de texto fragmentado para que no salte de columna
-                                respuesta = ", ".join(fila[2:])
-                            else:
-                                cuando = fila[0] if len(fila) > 0 else ""
-                                pregunta = "Consulta no estructurada"
-                                respuesta = "No registrada"
-                                
-                            filas_reparadas.append({
-                                "Cuándo": cuando.strip(),
-                                "Qué preguntaron": pregunta.strip(),
-                                "Respuesta de Aura": respuesta.strip()
-                            })
-                    
-                    if filas_reparadas:
-                        df_log = pd.DataFrame(filas_reparadas)[["Cuándo", "Qué preguntaron", "Respuesta de Aura"]]
-                        # Reescribir el archivo local bajo un formato estrictamente estandarizado
-                        df_log.to_csv(ARCHIVO_BITACORA, index=False, encoding='utf-8', quoting=csv.QUOTE_MINIMAL)
-                except Exception as e_reparacion:
-                    st.error(f"Error en procesamiento de contingencia: {e_reparacion}")
-
-            if df_log is not None and not df_log.empty:
-                st.dataframe(df_log.iloc[::-1], use_container_width=True)
+                # Lectura estándar limpia. 'on_bad_lines="skip"' descarta de forma segura
+                # cualquier fila rota o mal armada durante los experimentos anteriores.
+                df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8', on_bad_lines='skip')
                 
-                csv_data = df_log.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📥 Descargar Reporte Completo (CSV)",
-                    data=csv_data,
-                    file_name=f"interacciones_aura_{datetime.now().strftime('%d_%m_%Y')}.csv",
-                    mime="text/csv"
-                )
-            else:
-                st.info("La bitácora está lista y esperando nuevos registros.")
+                if not df_log.empty:
+                    st.dataframe(df_log.iloc[::-1], use_container_width=True)
+                    
+                    csv_data = df_log.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="📥 Descargar Reporte Completo (CSV)",
+                        data=csv_data,
+                        file_name=f"interacciones_aura_{datetime.now().strftime('%d_%m_%Y')}.csv",
+                        mime="text/csv"
+                    )
+                else:
+                    st.info("El archivo de bitácora está vacío.")
+            except Exception as e:
+                st.error(f"Error al leer la bitácora local: {e}")
         else:
             st.info("Aún no se registran interacciones en este servidor.")
