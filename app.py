@@ -18,20 +18,23 @@ api_key = st.secrets.get("gemini_api_key", None)
 # CONFIGURACIÓN DE ALMACENAMIENTO DUAL
 ARCHIVO_BITACORA = "consultas_local.csv"
 ARCHIVO_CONOCIMIENTO = "vector_store.json"
-NOMBRE_HOJA_SHEETS = "Bitacora_Aura"  # Coincide exactamente con su archivo en Google Drive
+NOMBRE_HOJA_SHEETS = "Bitacora_Aura"  # Debe coincidir exactamente con el nombre de su Google Sheets
 
 def conectar_google_sheets():
-    """Establece conexión sólida con Google Sheets usando oauth2client en memoria"""
+    """Establece conexión sólida limpiando la llave privada de los secretos en memoria"""
     try:
-        # Definición de los alcances (scopes) requeridos por la API de Google
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         
-        # Estructuración exacta del diccionario desde los secretos TOML
+        # Corrección de saltos de línea en la llave privada si viene mal escapada de Streamlit Cloud
+        private_key = st.secrets["gspread"]["private_key"]
+        if "\\n" in private_key:
+            private_key = private_key.replace("\\n", "\n")
+            
         credenciales_dict = {
             "type": st.secrets["gspread"]["type"],
             "project_id": st.secrets["gspread"]["project_id"],
             "private_key_id": st.secrets["gspread"]["private_key_id"],
-            "private_key": st.secrets["gspread"]["private_key"],
+            "private_key": private_key,
             "client_email": st.secrets["gspread"]["client_email"],
             "client_id": st.secrets["gspread"]["client_id"],
             "auth_uri": st.secrets["gspread"]["auth_uri"],
@@ -40,29 +43,23 @@ def conectar_google_sheets():
             "client_x509_cert_url": st.secrets["gspread"]["client_x509_cert_url"]
         }
         
-        # Autorización por medio de ServiceAccountCredentials (Evita buscar archivos físicos)
         creds = ServiceAccountCredentials.from_json_keyfile_dict(credenciales_dict, scope)
         gc = gspread.authorize(creds)
-        
-        # Apertura de la hoja de cálculo
         sh = gc.open(NOMBRE_HOJA_SHEETS)
-        return sh.sheet1  # Accede de forma directa a la primera pestaña
+        return sh.sheet1  # Accede directamente a la primera pestaña
     except Exception as e:
-        # Permite monitorear el error exacto en la consola del servidor en caso de fallas estructurales
-        print(f"Error crítico de conexión en Sheets: {e}")
+        st.session_state["error_gsheets_conexion"] = str(e)
         return None
 
 def registrar_consulta_dual(texto_pregunta, respuesta_o_error):
-    """
-    Registra la interacción de forma dual obligatoria (CSV local y Google Sheets).
-    Diseñado para procesar respuestas de la tutora e incidentes de cuota agotada.
-    """
+    """Registra de forma dual forzando la conversión limpia a texto plano"""
     ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-    # Limpieza básica para evitar rupturas en el formato de celdas
-    p_limpia = str(texto_pregunta).replace("\n", " ").replace("\r", " ").replace('"', '""')
-    r_limpia = str(respuesta_o_error).replace("\n", " ").replace("\r", " ").replace('"', '""')
     
-    # --- OPERACIÓN 1: ALMACENAMIENTO LOCAL (CSV) ---
+    # Limpieza estricta de cadenas para evitar errores de formato en las celdas de Sheets
+    p_limpia = str(texto_pregunta).replace("\n", " ").replace("\r", " ").strip()
+    r_limpia = str(respuesta_o_error).replace("\n", " ").replace("\r", " ").strip()
+    
+    # --- OPERACIÓN 1: CSV LOCAL ---
     try:
         nuevo_registro = pd.DataFrame([{
             "Cuándo": ahora, 
@@ -76,14 +73,17 @@ def registrar_consulta_dual(texto_pregunta, respuesta_o_error):
     except Exception:
         pass
 
-    # --- OPERACIÓN 2: ALMACENAMIENTO EN LA NUBE (GOOGLE SHEETS) ---
+    # --- OPERACIÓN 2: GOOGLE SHEETS ---
     try:
         hoja = conectar_google_sheets()
         if hoja is not None:
-            # Inserción limpia de la nueva fila al final de la hoja de cálculo
-            hoja.append_row([ahora, p_limpia, r_limpia])
+            hoja.append_row([str(ahora), str(p_limpia), str(r_limpia)])
+            st.session_state["error_gsheets_escritura"] = None
+        else:
+            if "error_gsheets_conexion" not in st.session_state:
+                st.session_state["error_gsheets_escritura"] = "No se pudo establecer conexión (Hoja ausente o credenciales inválidas)."
     except Exception as e:
-        print(f"Error al escribir fila en Sheets: {e}")
+        st.session_state["error_gsheets_escritura"] = str(e)
 
 @st.cache_data
 def cargar_contexto_catedra():
@@ -178,11 +178,11 @@ tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
 # ==========================================
 with tab_eda:
     system_instruction = f"""
-Eres Aura, una tutora académica en línea experta en Derecho del Trabajo para el de la Universidad Centroccidental Lisandro Alvarado (UCLA).
+Eres Aura, una tutora académica en línea experta en Derecho del Trabajo para la Universidad Centroccidental Lisandro Alvarado (UCLA).
 Tu comunicación debe caracterizarse por una claridad respetuosa y una honestidad total.
 
 PAUTAS DE COMPORTAMIENTO Y PEDAGOGÍA:
-- Tu propósito es guiar a quienes estudiar de forma pedagógica, rigurosa aunque amable, clara, cálida y cercana.
+- Tu propósito es guiar de forma pedagógica, rigurosa aunque amable, clara, cálida y cercana.
 - Utiliza siempre un lenguaje neutral, inclusivo y formal, adecuado para el ámbito de la educación universitaria virtual o a distancia.
 
 FUENTE PRINCIPAL DE CONOCIMIENTO (REPOSITORIO DE LA CÁTEDRA):
@@ -239,7 +239,7 @@ FUENTE PRINCIPAL DE CONOCIMIENTO (REPOSITORIO DE LA CÁTEDRA):
                     except Exception as e:
                         error_str = str(e)
                         if "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
-                            clean_error = "ERROR DE CONEXIÓN: Se ha agotado la cuota temporal de consultas de la API."
+                            clean_error = "Se ha agotado la cuota temporal de consultas de la API. El servicio se restablecerá pronto."
                         else:
                             clean_error = f"ERROR DE PROCESAMIENTO: {error_str}"
                         
@@ -247,7 +247,7 @@ FUENTE PRINCIPAL DE CONOCIMIENTO (REPOSITORIO DE LA CÁTEDRA):
                         registrar_consulta_dual(prompt, clean_error)
 
 # ==========================================
-# PESTAÑA 2: PROFESOR (MONITORIZACIÓN LOCAL)
+# PESTAÑA 2: PROFESOR (MONITORIZACIÓN)
 # ==========================================
 with tab_profesor:
     st.subheader("Bitácora de Consultas Locales")
@@ -280,3 +280,17 @@ with tab_profesor:
                 st.error(f"Error al leer la bitácora local de forma estructurada: {e}")
         else:
             st.info("Aún no se registran interacciones en este servidor.")
+            
+        # BLOQUE DE AUDITORÍA DE GOOGLE SHEETS
+        st.markdown("---")
+        st.subheader("Estado del Enlace con Google Sheets")
+        
+        if st.button("🔄 Probar Conexión en Tiempo Real"):
+            test_hoja = conectar_google_sheets()
+            if test_hoja:
+                st.success("¡Conexión exitosa con la API de Google Sheets! El canal está abierto.")
+            else:
+                st.error(f"Falla de enlace: {st.session_state.get('error_gsheets_conexion', 'Error desconocido')}")
+                
+        if st.session_state.get("error_gsheets_escritura"):
+            st.error(f"Último incidente de escritura en la nube: {st.session_state['error_gsheets_escritura']}")
