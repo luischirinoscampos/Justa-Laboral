@@ -45,6 +45,9 @@ def reiniciar_conversacion():
         }
     ]
     st.session_state.ultimo_envio = 0.0
+    # También cerramos el panel del profesor si estaba abierto
+    st.session_state.show_profesor = False
+    st.session_state.profesor_autenticado = False
 
 # ==========================================
 # 3. CACHÉ DE RESPUESTAS
@@ -187,11 +190,24 @@ st.markdown("""
         border-radius: 12px !important;
     }
     
-    /* Botón de reinicio */
+    /* Botones */
     .stButton > button {
         background-color: #0A2540 !important;
         color: white !important;
         border-radius: 8px !important;
+    }
+    
+    /* Botón discreto del profesor (sin fondo llamativo) */
+    div[data-testid="column"] .stButton > button {
+        background-color: transparent !important;
+        color: #4A5568 !important;
+        font-size: 1.2rem !important;
+        padding: 0px 8px !important;
+        box-shadow: none !important;
+    }
+    div[data-testid="column"] .stButton > button:hover {
+        color: #0A2540 !important;
+        background-color: transparent !important;
     }
     
     /* Ocultar elementos */
@@ -223,6 +239,12 @@ if "messages" not in st.session_state:
 if "ultimo_envio" not in st.session_state:
     st.session_state.ultimo_envio = 0.0
 
+if "show_profesor" not in st.session_state:
+    st.session_state.show_profesor = False
+
+if "profesor_autenticado" not in st.session_state:
+    st.session_state.profesor_autenticado = False
+
 # ==========================================
 # 9. DETECCIÓN DE EVALUACIONES
 # ==========================================
@@ -252,15 +274,76 @@ REGLAS:
 """
 
 # ==========================================
-# 11. INTERFAZ DE CHAT (sin pestañas visibles)
+# 11. BARRA SUPERIOR CON BOTONES (Reinicio + Profesor discreto)
 # ==========================================
-# Botón de reinicio
-col1, col2 = st.columns([6, 1])
+col1, col2, col3 = st.columns([5, 1, 1])
 with col2:
     if st.button("🔄", help="Reiniciar conversación"):
         reiniciar_conversacion()
         st.rerun()
+with col3:
+    if st.button("🔒", help="Acceso profesor"):
+        st.session_state.show_profesor = not st.session_state.show_profesor
+        st.session_state.profesor_autenticado = False
+        st.rerun()
 
+# ==========================================
+# 12. PANEL DEL PROFESOR (si está activo)
+# ==========================================
+if st.session_state.show_profesor:
+    with st.container():
+        st.markdown("---")
+        st.markdown("### 📋 Panel del Profesor")
+        
+        if not st.session_state.profesor_autenticado:
+            clave = st.text_input("Credencial docente:", type="password", key="profesor_clave")
+            if clave:
+                if clave == "UCLA2026":
+                    st.session_state.profesor_autenticado = True
+                    st.success("✅ Acceso concedido")
+                    st.rerun()
+                else:
+                    st.error("❌ Credencial incorrecta")
+        else:
+            st.success("✅ Sesión activa")
+            
+            # Mostrar bitácora
+            if os.path.exists(ARCHIVO_BITACORA):
+                try:
+                    df = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
+                    if not df.empty:
+                        st.dataframe(df.iloc[::-1], use_container_width=True)
+                        csv_data = df.to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            label="📥 Descargar CSV",
+                            data=csv_data,
+                            file_name=f"aura_bitacora_{datetime.now().strftime('%d_%m_%Y')}.csv",
+                            mime="text/csv"
+                        )
+                        
+                        # Estadísticas
+                        st.markdown("---")
+                        st.subheader("📊 Estadísticas")
+                        st.metric("Total de consultas", len(df))
+                        bloqueos = df[df["Respuesta de Aura"].str.contains("BLOQUEADO", na=False)].shape[0] if "Respuesta de Aura" in df.columns else 0
+                        if bloqueos > 0:
+                            st.warning(f"🚨 Intentos bloqueados: {bloqueos}")
+                    else:
+                        st.info("No hay registros aún.")
+                except Exception as e:
+                    st.error(f"Error al leer bitácora: {e}")
+            else:
+                st.info("No hay registros aún.")
+            
+            # Botón para cerrar panel
+            if st.button("🔒 Cerrar panel"):
+                st.session_state.show_profesor = False
+                st.session_state.profesor_autenticado = False
+                st.rerun()
+
+# ==========================================
+# 13. INTERFAZ DE CHAT
+# ==========================================
 # Mostrar mensajes
 for message in st.session_state.messages:
     with st.chat_message(message["role"], avatar=message.get("avatar")):
@@ -330,31 +413,3 @@ if prompt:
                     error_msg = "📚 Aura está recibiendo muchas consultas. Espera un momento." if "RESOURCE_EXHAUSTED" in str(e) else f"⚠️ Error: {str(e)[:150]}"
                     st.error(error_msg)
                     registrar_consulta_dual(prompt, error_msg)
-
-# ==========================================
-# 12. ACCESO OCULTO PARA EL PROFESOR (URL secreta)
-# ==========================================
-# Para ver la bitácora, añade "?admin=true" al final de la URL
-# Ejemplo: https://tu-app.streamlit.app/?admin=true
-
-import urllib.parse
-query_params = st.query_params
-
-if query_params.get("admin") == ["true"]:
-    st.markdown("---")
-    st.subheader("📋 Panel del Profesor")
-    clave = st.text_input("Credencial:", type="password")
-    
-    if clave == "UCLA2026":
-        st.success("Acceso concedido")
-        if os.path.exists(ARCHIVO_BITACORA):
-            df = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
-            if not df.empty:
-                st.dataframe(df.iloc[::-1], use_container_width=True)
-                st.download_button("📥 Descargar CSV", df.to_csv(index=False).encode('utf-8'), "bitacora.csv")
-            else:
-                st.info("Sin registros")
-        else:
-            st.info("Sin registros")
-    elif clave:
-        st.error("Credencial incorrecta")
