@@ -31,7 +31,7 @@ def obtener_contexto_relevante(query):
                 contenido = item.get('texto_contenido', '').lower()
                 if any(w in contenido for w in query_words):
                     relevante.append(item['texto_contenido'])
-            return "\n".join(relevante[:3]) # Limita a los 3 más relevantes
+            return "\n".join(relevante[:3])
     except: return ""
 
 def conectar_google_sheets():
@@ -53,21 +53,24 @@ def registrar_consulta_dual(texto_pregunta, respuesta_o_error):
     ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
     p_limpia, r_limpia = [str(x).replace("\n", " ").strip() for x in [texto_pregunta, respuesta_o_error]]
     
-    # CSV Local
     pd.DataFrame([{"Cuándo": ahora, "Pregunta": p_limpia, "Respuesta": r_limpia}]).to_csv(
         ARCHIVO_BITACORA, mode='a', header=not os.path.exists(ARCHIVO_BITACORA), index=False, encoding='utf-8')
 
-    # Sheets
     hoja = conectar_google_sheets()
     if hoja: hoja.append_row([ahora, p_limpia, r_limpia])
 
-# 2. INTERFAZ Y LÓGICA
-st.markdown("""<style>...CSS_PREVIO...</style>""", unsafe_allow_html=True) # Mantener estilos previos
+# 2. INTERFAZ
+st.markdown("""
+    <style>
+    .custom-header { text-align: center; margin-bottom: 20px; }
+    .line-1 { font-size: 2.4rem; font-weight: 700; }
+    </style>
+""", unsafe_allow_html=True)
 
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "avatar": "✨", "content": "¡Hola! Soy Aura..."}]
+    st.session_state.messages = [{"role": "assistant", "avatar": "✨", "content": "¡Hola! Soy Aura, tu tutora académica. ¿En qué puedo apoyarte hoy?"}]
 
-st.markdown('<div class="custom-header">...ENCABEZADO...</div>', unsafe_allow_html=True)
+st.markdown('<div class="custom-header"><div class="line-1">Aura</div><p>Tutora Académica en Línea</p></div>', unsafe_allow_html=True)
 
 tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
 
@@ -78,20 +81,13 @@ with tab_eda:
 
     if prompt := st.chat_input("Escribe tu consulta aquí..."):
         st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
-        
         with st.chat_message("assistant", avatar="✨"):
             try:
                 contexto = obtener_contexto_relevante(prompt)
                 system_instruction = f"Eres Aura, tutora académica experta. Contexto disponible: {contexto}. Usa lenguaje neutral e inclusivo, adecuado para modalidad virtual o a distancia."
-                
                 client = genai.Client(api_key=api_key)
-                # Ventana deslizante: últimos 6 mensajes
-                history = [types.Content(role="model" if m["role"]=="assistant" else "user", 
-                           parts=[types.Part.from_text(m["content"])]) for m in st.session_state.messages[-6:]]
-                
-                response = client.models.generate_content(model='gemini-2.5-flash', contents=history, 
-                                                        config=types.GenerateContentConfig(system_instruction=system_instruction))
-                
+                history = [types.Content(role="model" if m["role"]=="assistant" else "user", parts=[types.Part.from_text(m["content"])]) for m in st.session_state.messages[-6:]]
+                response = client.models.generate_content(model='gemini-2.5-flash', contents=history, config=types.GenerateContentConfig(system_instruction=system_instruction))
                 st.markdown(response.text)
                 st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": response.text})
                 registrar_consulta_dual(prompt, response.text)
@@ -100,4 +96,13 @@ with tab_eda:
                 registrar_consulta_dual(prompt, str(e))
 
 with tab_profesor:
-    # ... Lógica de bitácora manteniendo la autenticación ya existente ...
+    st.subheader("Bitácora de Consultas")
+    if st.text_input("Credencial docente:", type="password") == "UCLA2026":
+        st.success("Acceso verificado")
+        if os.path.exists(ARCHIVO_BITACORA):
+            df = pd.read_csv(ARCHIVO_BITACORA)
+            st.dataframe(df.iloc[::-1])
+        else:
+            st.info("Sin registros aún.")
+    else:
+        st.warning("Acceso restringido.")
