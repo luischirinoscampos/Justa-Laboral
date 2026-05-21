@@ -21,7 +21,7 @@ ARCHIVO_BITACORA = "consultas_local.csv"
 ARCHIVO_CONOCIMIENTO = "vector_store.json"
 
 def registrar_consulta_local(texto_pregunta, texto_respuesta=""):
-    """Guarda la consulta de inmediato en un archivo CSV local incluyendo la respuesta de Aura"""
+    """Guarda la consulta y la respuesta de Aura encapsulándolas de forma segura en el CSV"""
     try:
         ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
         nuevo_registro = pd.DataFrame([{
@@ -30,7 +30,11 @@ def registrar_consulta_local(texto_pregunta, texto_respuesta=""):
             "Respuesta de Aura": texto_respuesta
         }])
         
+        # Se fuerza el orden correcto de las columnas
+        nuevo_registro = nuevo_registro[["Cuándo", "Qué preguntaron", "Respuesta de Aura"]]
+        
         if os.path.exists(ARCHIVO_BITACORA):
+            # Se añade el registro al final asegurando que los textos se mantengan encapsulados adecuadamente
             nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='a', header=False, index=False, encoding='utf-8')
         else:
             nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='w', header=True, index=False, encoding='utf-8')
@@ -38,14 +42,14 @@ def registrar_consulta_local(texto_pregunta, texto_respuesta=""):
         pass
 
 # =========================================================================
-# MOTOR DE BÚSQUEDA SEMÁNTICA (RAG LOCAL) - OPCIÓN 2
+# MOTOR DE BÚSQUEDA SEMÁNTICA (RAG LOCAL)
 # =========================================================================
 def limpiar_y_tokenizar(texto):
     """Limpia el texto y lo divide en palabras significativas"""
     texto = texto.lower()
-    texto = re.sub(r'[^\w\s]', ' ', texto)
+    re_limpieza = re.compile(r'[^\w\s]')
+    texto = re_limpieza.sub(' ', texto)
     palabras = texto.split()
-    # Palabras vacías comunes en derecho para filtrar ruido
     stopwords = {'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'de', 'del', 'en', 'para', 'por', 'con', 'y', 'o', 'que', 'su', 'sus', 'al'}
     return [p for p in palabras if p not in stopwords and len(p) > 2]
 
@@ -86,14 +90,10 @@ def buscar_contexto_relevante(pregunta_usuario, top_n=3):
             contenido = item.get('texto_contenido', '')
             nombre_archivo = item.get('nombre_archivo', 'Documento sin nombre')
             
-            # Evaluamos la similitud matemática entre la duda y el bloque de texto
             score = calcular_similitud_texto(pregunta_usuario, contenido)
             puntuaciones.append((score, nombre_archivo, contenido))
             
-        # Ordenar de mayor a menor relevancia
         puntuaciones.sort(key=lambda x: x[0], reverse=True)
-        
-        # Seleccionar solo los mejores N fragmentos
         fragmentos_seleccionados = [p for p in puntuaciones[:top_n] if p[0] > 0.0]
         
         if not fragmentos_seleccionados:
@@ -223,11 +223,8 @@ with tab_eda:
                 else:
                     try:
                         client = genai.Client(api_key=api_key)
-                        
-                        # PASO CLAVE: Buscar dinámicamente solo el contexto relevante para ESTE prompt específico
                         contexto_acotado = buscar_contexto_relevante(prompt, top_n=3)
                         
-                        # Construcción de la instrucción del sistema dinámica y optimizada
                         system_instruction = f"""
 Eres Aura, una tutora académica en línea experta en Derecho del Trabajo para el DCEE de la Universidad Centroccidental Lisandro Alvarado (UCLA).
 Tu comunicación debe caracterizarse por una claridad respetuosa y una honestidad total.
@@ -252,7 +249,6 @@ DIRECTRICES DE RESPUESTA:
 2. Si el fragmento proporcionado arriba no contiene la solución y la duda no se relaciona con los objetivos académicos de la asignatura, indícalo abiertamente con honestidad académica y reorienta la conversación hacia los temas de estudio laboral.
 """
                         
-                        # Construir el historial de conversación para la API
                         history_contents = []
                         for msg in st.session_state.messages:
                             role_mapped = "model" if msg["role"] == "assistant" else "user"
@@ -271,22 +267,18 @@ DIRECTRICES DE RESPUESTA:
                             config=config
                         )
                         
-                        # Se muestra la respuesta en pantalla
                         st.markdown(response.text)
                         
-                        # PASO NUEVO: Guardar en la bitácora local asociando la pregunta con la respuesta emitida
+                        # Almacenamiento seguro en la bitácora vinculando ambas partes
                         registrar_consulta_local(prompt, response.text)
                         
                         st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": response.text})
-                        
                         st.rerun()
                         
                     except Exception as e:
                         error_str = str(e)
                         clean_error = "Se ha agotado la cuota temporal de consultas de la API. El servicio se restablecerá pronto." if "RESOURCE_EXHAUSTED" in error_str else f"Ocurrió un inconveniente: {error_str}"
                         st.error(clean_error)
-                        
-                        # Si ocurre un error de API, se registra la pregunta indicando la falla en la columna de respuesta
                         registrar_consulta_local(prompt, f"ERROR DE CONEXIÓN: {clean_error}")
 
 # ==========================================
@@ -301,6 +293,7 @@ with tab_profesor:
         
         if os.path.exists(ARCHIVO_BITACORA):
             try:
+                # Se lee el CSV garantizando la correcta decodificación de las celdas de texto
                 df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
                 if not df_log.empty:
                     st.dataframe(df_log.iloc[::-1], use_container_width=True)
@@ -315,6 +308,7 @@ with tab_profesor:
                 else:
                     st.info("El archivo de bitácora está vacío.")
             except Exception as e:
-                st.error(f"Error al leer la bitácora local: {e}")
+                st.error(f"Error al leer la bitácora local de forma estructurada: {e}")
+                st.info("Nota técnica: Si el archivo previo quedó corrupto por comas sueltas, bórrelo del servidor para que el nuevo sistema lo regenere correctamente desde cero.")
         else:
             st.info("Aún no se registran interacciones en este servidor.")
