@@ -21,7 +21,7 @@ def registrar_consulta_local(texto_pregunta, respuesta_aura):
     """Guarda la consulta en un archivo CSV local con estructura estricta de dos columnas"""
     try:
         ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-        # Integración compacta de la pregunta y la respuesta en una sola cadena de texto
+        # Integración de la pregunta y la respuesta en una sola cadena de texto
         detalle_integrado = f"PREGUNTA: {texto_pregunta} | RESPUESTA DE AURA: {respuesta_aura}"
         
         nuevo_registro = pd.DataFrame([{"Cuándo": ahora, "Detalle de la Consulta": detalle_integrado}])
@@ -254,7 +254,7 @@ DIRECTRICES DE RESPUESTA:
                         st.markdown(respuesta_texto)
                         st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta_texto})
                         
-                        # El registro local ocurre aquí, capturando ambas partes en la estructura unificada de dos columnas
+                        # Captura e integra los datos antes de guardarlos
                         registrar_consulta_local(prompt, respuesta_texto)
                         
                         st.rerun()
@@ -278,10 +278,11 @@ with tab_profesor:
             try:
                 df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
                 if not df_log.empty:
-                    # Muestra las dos columnas del dataframe: 'Cuándo' y 'Detalle de la Consulta'
-                    st.dataframe(df_log.iloc[::-1], use_container_width=True)
+                    # Garantiza que la visualización tenga estrictamente las dos columnas correctas
+                    df_render = df_log[["Cuándo", "Detalle de la Consulta"]]
+                    st.dataframe(df_render.iloc[::-1], use_container_width=True)
                     
-                    csv_data = df_log.to_csv(index=False).encode('utf-8')
+                    csv_data = df_render.to_csv(index=False).encode('utf-8')
                     st.download_button(
                         label="📥 Descargar Reporte Completo (CSV)",
                         data=csv_data,
@@ -292,6 +293,6 @@ with tab_profesor:
                     st.info("El archivo de bitácora está vacío.")
             except Exception as e:
                 st.error(f"Error al leer la bitácora local de forma estructurada: {e}")
-                st.info("Nota técnica: Si el archivo previo quedó corrupto por la estructura antigua, bórrelo del servidor para que el nuevo sistema lo regenere correctamente desde cero.")
+                st.info("Nota técnica: Para evitar conflictos visuales con el esquema de tres columnas viejo, elimine el archivo 'consultas_local.csv' anterior del servidor para que el nuevo sistema lo genere limpio.")
         else:
             st.info("Aún no se registran interacciones en este servidor.")
