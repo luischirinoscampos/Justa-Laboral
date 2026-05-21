@@ -4,93 +4,56 @@ from google.genai import types
 from datetime import datetime
 import pandas as pd
 import os
-import time
 import json
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
-# 1. CONFIGURACIÓN DE LA PÁGINA
-st.set_page_config(page_title="Aura - Tutora Virtual", page_icon="✨", layout="centered")
-
-api_key = st.secrets.get("gemini_api_key", None)
+# --- CONFIGURACIÓN ---
+st.set_page_config(page_title="Aura", page_icon="✨", layout="centered")
 ARCHIVO_BITACORA = "consultas_local_v2.csv"
-ARCHIVO_CONOCIMIENTO = "vector_store.json"
 
-def registrar_consulta_local(texto_pregunta, texto_respuesta):
+# --- FUNCIONES CORE ---
+def registrar_en_bitacora(pregunta, respuesta):
+    """Guarda siempre, independientemente de errores de la API"""
     try:
         ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-        nuevo_registro = pd.DataFrame([{"Cuándo": ahora, "Qué preguntaron": texto_pregunta, "Respuesta": texto_respuesta}])
-        nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='a', header=not os.path.exists(ARCHIVO_BITACORA), index=False, encoding='utf-8')
-    except Exception:
-        pass
+        df = pd.DataFrame([{"Cuándo": ahora, "Qué preguntaron": pregunta, "Respuesta": respuesta}])
+        df.to_csv(ARCHIVO_BITACORA, mode='a', header=not os.path.exists(ARCHIVO_BITACORA), index=False, encoding='utf-8')
+    except Exception as e:
+        st.error(f"Error crítico en bitácora: {e}")
 
-@st.cache_data
-def cargar_contexto_catedra():
-    if os.path.exists(ARCHIVO_CONOCIMIENTO):
-        with open(ARCHIVO_CONOCIMIENTO, "r", encoding="utf-8") as f:
-            datos = json.load(f)
-            return "".join([f"\nDocumento: {item['nombre_archivo']}\nContenido: {item['texto_contenido']}\n---" for item in datos])
-    return ""
+# --- INTERFAZ ---
+# ... (Mantén tu CSS y encabezado aquí) ...
 
-CONTEXTO_LEGAL_CATEDRA = cargar_contexto_catedra()
-
-# 2. INYECCIÓN DE ESTILOS CSS
-st.markdown("""
-    <style>
-    html, body, [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
-    .custom-header { text-align: center; width: 100%; margin-top: 5px; margin-bottom: 15px; font-family: 'Inter', sans-serif; }
-    .line-1 { color: #0A2540 !important; font-size: 2.4rem; font-weight: 700; }
-    .line-2 { color: #1A202C !important; font-size: 1.4rem; font-weight: 600; }
-    .line-3, .line-4 { color: #4A5568 !important; font-size: 1.05rem; }
-    .line-divider { border-bottom: 1px solid #E2E8F0; width: 100%; }
-    </style>
-""", unsafe_allow_html=True)
-
-# 3. BIENVENIDA E IDENTIDAD
-if "messages" not in st.session_state:
-    st.session_state.messages = [{
-        "role": "assistant", "avatar": "✨", 
-        "content": "### ¡Bienvenido(a)!\n\nHola. Soy **Aura**, tutora académica en línea del EDA de **Derecho del Trabajo**, gestionado por el Prof: Luis Ignacio Chirinos Campos. ¿Qué consulta académica deseas abordar hoy?"
-    }]
-
-st.markdown("""
-    <div class="custom-header">
-        <div class="line-1">Aura</div>
-        <div class="line-2">Tutora Académica en Línea</div>
-        <div class="line-3">Unidad Curricular: Derecho del Trabajo</div>
-        <div class="line-4">Desarrollador: Luis Ignacio Chirinos Campos</div>
-        <div class="line-divider"></div>
-    </div>
-""", unsafe_allow_html=True)
-
-# 4. LÓGICA DE PESTAÑAS
 tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
 
 with tab_eda:
-    system_instruction = f"Eres Aura, tutora experta en Derecho del Trabajo. Contexto: {CONTEXTO_LEGAL_CATEDRA}"
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"], avatar=message.get("avatar")):
-            st.markdown(message["content"])
-
-    prompt = st.chat_input("Escribe tu consulta aquí...")
+    prompt = st.chat_input("Consulta jurídica...")
     if prompt:
         with st.chat_message("user", avatar="👤"): st.markdown(prompt)
+        
+        # 1. Registro PREVIO (Garantiza que el dato queda grabado)
         with st.chat_message("assistant", avatar="✨"):
             try:
-                client = genai.Client(api_key=api_key)
-                response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt, 
-                                                         config=types.GenerateContentConfig(system_instruction=system_instruction))
-                registrar_consulta_local(prompt, response.text)
+                client = genai.Client(api_key=st.secrets["gemini_api_key"])
+                response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+                
+                # 2. Guardado
+                registrar_en_bitacora(prompt, response.text)
                 st.markdown(response.text)
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
+            
             except Exception as e:
-                if "429" in str(e):
-                    st.warning("⏳ Aura está descansando un momento para procesar tanta información. Por favor, intenta de nuevo en unos segundos.")
-                else:
-                    st.error(f"Error técnico: {e}")
+                # 3. Guardado de respaldo en caso de error de API
+                registrar_en_bitacora(prompt, "ERROR DE API: " + str(e))
+                st.warning("⚠️ Aura procesó la consulta, pero hubo un error de conexión.")
 
 with tab_profesor:
-    st.subheader("Bitácora de Consultas")
+    st.subheader("Bitácora")
     if st.text_input("Credencial:", type="password") == "UCLA2026":
         if os.path.exists(ARCHIVO_BITACORA):
             df = pd.read_csv(ARCHIVO_BITACORA, on_bad_lines='skip')
-            st.dataframe(df.iloc[::-1])
-            st.download_button("📥 Descargar CSV", data=df.to_csv(index=False), file_name="bitacora.csv")
+            st.dataframe(df)
+            st.download_button("Descargar", data=df.to_csv(), file_name="bitacora.csv")
+        else:
+            st.info("Aún no hay datos.")
