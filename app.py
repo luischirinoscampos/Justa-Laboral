@@ -11,7 +11,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Aura - Tutora Virtual", page_icon="✨", layout="centered")
 
-# --- SECRETOS ---
+# --- VARIABLES Y SECRETOS ---
 api_key = st.secrets.get("gemini_api_key", None)
 ARCHIVO_BITACORA = "consultas_local.csv"
 ARCHIVO_CONOCIMIENTO = "vector_store.json"
@@ -43,17 +43,24 @@ def registrar_consulta_dual(p, r):
     ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
     p_limpia, r_limpia = str(p).replace("\n", " ").strip(), str(r).replace("\n", " ").strip()
     
-    # CSV
+    # 1. Registro CSV
     df = pd.DataFrame([{"Cuándo": ahora, "Pregunta": p_limpia, "Respuesta": r_limpia}])
     df.to_csv(ARCHIVO_BITACORA, mode='a', header=not os.path.exists(ARCHIVO_BITACORA), index=False, encoding='utf-8')
     
-    # Sheets
+    # 2. Registro Sheets
     hoja = conectar_google_sheets()
     if hoja:
         try: hoja.append_row([ahora, p_limpia, r_limpia])
         except: pass
 
-# --- ESTILOS CSS ---
+@st.cache_data
+def cargar_contexto():
+    if os.path.exists(ARCHIVO_CONOCIMIENTO):
+        with open(ARCHIVO_CONOCIMIENTO, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+# --- INTERFAZ VISUAL ---
 st.markdown("""
     <style>
     .custom-header { text-align: center; margin-bottom: 20px; font-family: 'Inter', sans-serif; }
@@ -68,7 +75,7 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# --- APP ---
+# --- APP PRINCIPAL ---
 tab_eda, tab_profesor = st.tabs(["💬 EDA", "🔐 Profesor"])
 
 with tab_eda:
@@ -90,16 +97,20 @@ with tab_eda:
                 respuesta = response.text
             except Exception as e:
                 err = str(e)
-                respuesta = "ERROR: Cuota de API agotada." if any(x in err for x in ["429", "RESOURCE_EXHAUSTED"]) else f"ERROR: {err}"
+                respuesta = "ERROR DE CONEXIÓN: Se ha agotado la cuota de la API." if any(x in err for x in ["429", "RESOURCE_EXHAUSTED"]) else f"ERROR: {err}"
                 st.error(respuesta)
             
             st.markdown(respuesta)
             st.session_state.messages.append({"role": "assistant", "content": respuesta})
-            # El registro ocurre SIEMPRE aquí abajo, independientemente del éxito de la API
+            
+            # EL REGISTRO OCURRE SIEMPRE
             registrar_consulta_dual(prompt, respuesta)
 
 with tab_profesor:
     st.subheader("Bitácora de Consultas")
     if st.text_input("Credencial Docente", type="password") == "UCLA2026":
-        if os.path.exists(ARCHIVO_BITACORA): st.dataframe(pd.read_csv(ARCHIVO_BITACORA))
-        else: st.info("Sin registros.")
+        if os.path.exists(ARCHIVO_BITACORA): 
+            st.dataframe(pd.read_csv(ARCHIVO_BITACORA))
+        else: 
+            st.info("Sin registros.")
+            
