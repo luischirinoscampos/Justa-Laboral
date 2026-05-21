@@ -300,7 +300,7 @@ REGLAS:
     # ==========================================
     # 14. PROCESAMIENTO DEL CHAT
     # ==========================================
-    prompt = st.chat_input("Escribe tu consulta jurídica aquí...")
+    prompt = st.chat_input("Escribe tu consulta académica aquí...")
     
     if prompt:
         tiempo_actual = time.time()
