@@ -19,23 +19,19 @@ ARCHIVO_BITACORA = "consultas_local.csv"
 ARCHIVO_CONOCIMIENTO = "vector_store.json"
 
 def registrar_consulta_local(texto_pregunta, texto_respuesta=""):
-    """Guarda de forma estricta la consulta y la respuesta en el CSV de 3 columnas"""
+    """Guarda la consulta y la respuesta blindando el archivo CSV contra comas internas"""
     try:
         ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-        nuevo_registro = pd.DataFrame([{
-            "Cuándo": ahora, 
-            "Qué preguntaron": texto_pregunta, 
-            "Respuesta de Aura": texto_respuesta
-        }])
+        archivo_existe = os.path.exists(ARCHIVO_BITACORA)
         
-        # Forzar el orden correcto de los campos
-        nuevo_registro = nuevo_registro[["Cuándo", "Qué preguntaron", "Respuesta de Aura"]]
-        
-        if os.path.exists(ARCHIVO_BITACORA):
-            # Se añade al final protegiendo los textos con comillas para evitar rupturas por comas
-            nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='a', header=False, index=False, encoding='utf-8', quoting=csv.QUOTE_MINIMAL)
-        else:
-            nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='w', header=True, index=False, encoding='utf-8', quoting=csv.QUOTE_MINIMAL)
+        # Uso del módulo nativo csv con QUOTE_ALL para encapsular todo estrictamente entre comillas
+        with open(ARCHIVO_BITACORA, mode="a", encoding="utf-8", newline="") as f:
+            escritor = csv.writer(f, delimiter=",", quoting=csv.QUOTE_ALL)
+            
+            if not archivo_existe:
+                escritor.writerow(["Cuándo", "Qué preguntaron", "Respuesta de Aura"])
+                
+            escritor.writerow([ahora, texto_pregunta, texto_respuesta])
     except Exception:
         pass
 
@@ -216,7 +212,7 @@ DIRECTRICES DE RESPUESTA:
                         
                         st.markdown(response.text)
                         
-                        # Registro correcto con los dos textos en sus respectivas columnas
+                        # Registro seguro pasando ambos parámetros
                         registrar_consulta_local(prompt, response.text)
                         
                         st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": response.text})
@@ -240,9 +236,8 @@ with tab_profesor:
         
         if os.path.exists(ARCHIVO_BITACORA):
             try:
-                # Lectura estándar limpia. 'on_bad_lines="skip"' descarta de forma segura
-                # cualquier fila rota o mal armada durante los experimentos anteriores.
-                df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8', on_bad_lines='skip')
+                # Lectura limpia respetando el encapsulado estricto por comillas
+                df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8', quoting=csv.QUOTE_ALL, on_bad_lines='skip')
                 
                 if not df_log.empty:
                     st.dataframe(df_log.iloc[::-1], use_container_width=True)
