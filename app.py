@@ -7,6 +7,7 @@ import os
 import time
 import json
 import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 # 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Aura - Tutora Virtual", page_icon="✨", layout="centered")
@@ -17,12 +18,16 @@ api_key = st.secrets.get("gemini_api_key", None)
 # CONFIGURACIÓN DE ALMACENAMIENTO DUAL
 ARCHIVO_BITACORA = "consultas_local.csv"
 ARCHIVO_CONOCIMIENTO = "vector_store.json"
-NOMBRE_HOJA_SHEETS = "Bitacora_Aura"  # Debe coincidir exactamente con el nombre de su Google Sheets
+NOMBRE_HOJA_SHEETS = "Bitacora_Aura"  # Coincide exactamente con su archivo en Google Drive
 
 def conectar_google_sheets():
-    """Establece conexión con Google Sheets utilizando las credenciales de los secretos"""
+    """Establece conexión sólida con Google Sheets usando oauth2client en memoria"""
     try:
-        credenciales = {
+        # Definición de los alcances (scopes) requeridos por la API de Google
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        
+        # Estructuración exacta del diccionario desde los secretos TOML
+        credenciales_dict = {
             "type": st.secrets["gspread"]["type"],
             "project_id": st.secrets["gspread"]["project_id"],
             "private_key_id": st.secrets["gspread"]["private_key_id"],
@@ -32,21 +37,28 @@ def conectar_google_sheets():
             "auth_uri": st.secrets["gspread"]["auth_uri"],
             "token_uri": st.secrets["gspread"]["token_uri"],
             "auth_provider_x509_cert_url": st.secrets["gspread"]["auth_provider_x509_cert_url"],
-            "client_x509_cert_url": st.secrets["gspread"]["client_x509_cert_url"],
-            "universe_domain": st.secrets["gspread"].get("universe_domain", "googleapis.com")
+            "client_x509_cert_url": st.secrets["gspread"]["client_x509_cert_url"]
         }
-        gc = gspread.service_account_from_dict(credenciales)
+        
+        # Autorización por medio de ServiceAccountCredentials (Evita buscar archivos físicos)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(credenciales_dict, scope)
+        gc = gspread.authorize(creds)
+        
+        # Apertura de la hoja de cálculo
         sh = gc.open(NOMBRE_HOJA_SHEETS)
-        return sh.get_worksheet(0)  # Retorna la primera pestaña de la hoja
-    except Exception:
+        return sh.sheet1  # Accede de forma directa a la primera pestaña
+    except Exception as e:
+        # Permite monitorear el error exacto en la consola del servidor en caso de fallas estructurales
+        print(f"Error crítico de conexión en Sheets: {e}")
         return None
 
 def registrar_consulta_dual(texto_pregunta, respuesta_o_error):
     """
-    Registra la interacción obligatoriamente en el CSV local y en Google Sheets.
-    Funciona tanto para respuestas exitosas como para reportes de errores de la API.
+    Registra la interacción de forma dual obligatoria (CSV local y Google Sheets).
+    Diseñado para procesar respuestas de la tutora e incidentes de cuota agotada.
     """
     ahora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+    # Limpieza básica para evitar rupturas en el formato de celdas
     p_limpia = str(texto_pregunta).replace("\n", " ").replace("\r", " ").replace('"', '""')
     r_limpia = str(respuesta_o_error).replace("\n", " ").replace("\r", " ").replace('"', '""')
     
@@ -62,16 +74,16 @@ def registrar_consulta_dual(texto_pregunta, respuesta_o_error):
         else:
             nuevo_registro.to_csv(ARCHIVO_BITACORA, mode='w', header=True, index=False, encoding='utf-8')
     except Exception:
-        pass  # Evita que problemas de escritura en disco congelen la aplicación
+        pass
 
     # --- OPERACIÓN 2: ALMACENAMIENTO EN LA NUBE (GOOGLE SHEETS) ---
     try:
         hoja = conectar_google_sheets()
         if hoja is not None:
-            # Añade de manera segura la fila con los tres datos correspondientes
+            # Inserción limpia de la nueva fila al final de la hoja de cálculo
             hoja.append_row([ahora, p_limpia, r_limpia])
-    except Exception:
-        pass  # Si falla la conexión a internet, la aplicación continúa de forma fluida
+    except Exception as e:
+        print(f"Error al escribir fila en Sheets: {e}")
 
 @st.cache_data
 def cargar_contexto_catedra():
@@ -90,7 +102,7 @@ def cargar_contexto_catedra():
 
 CONTEXTO_LEGAL_CATEDRA = cargar_contexto_catedra()
 
-# 2. INYECCIÓN DE ESTILOS CSS (Fiel a la interfaz limpia de la cátedra)
+# 2. INYECCIÓN DE ESTILOS CSS (Interfaz de la Cátedra)
 st.markdown("""
     <style>
     html, body, [data-testid="stAppViewContainer"] {
@@ -206,7 +218,6 @@ FUENTE PRINCIPAL DE CONOCIMIENTO (REPOSITORIO DE LA CÁTEDRA):
                     registrar_consulta_dual(prompt, error_config)
                 else:
                     try:
-                        # Intento de comunicación con la API de Gemini
                         client = genai.Client(api_key=api_key)
                         history_contents = []
                         for msg in st.session_state.messages:
@@ -222,22 +233,17 @@ FUENTE PRINCIPAL DE CONOCIMIENTO (REPOSITORIO DE LA CÁTEDRA):
                         st.markdown(respuesta_texto)
                         st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta_texto})
                         
-                        # Guardado exitoso estándar
                         registrar_consulta_dual(prompt, respuesta_texto)
                         st.rerun()
                         
                     except Exception as e:
-                        # CAPTURA DE EXCEPCIONES: Control de errores de cuota o caídas externas
                         error_str = str(e)
                         if "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
                             clean_error = "ERROR DE CONEXIÓN: Se ha agotado la cuota temporal de consultas de la API."
                         else:
                             clean_error = f"ERROR DE PROCESAMIENTO: {error_str}"
                         
-                        # Muestra la advertencia limpia en la pantalla del usuario
                         st.error(clean_error)
-                        
-                        # SE FUERZA EL REGISTRO: Guarda el incidente tanto en el CSV local como en Google Sheets
                         registrar_consulta_dual(prompt, clean_error)
 
 # ==========================================
@@ -252,11 +258,9 @@ with tab_profesor:
         
         if os.path.exists(ARCHIVO_BITACORA):
             try:
-                # Lectura defensiva de la bitácora local
                 df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8', on_bad_lines='skip')
                 columnas_requeridas = ["Cuándo", "Qué preguntaron", "Respuesta de Aura"]
                 
-                # Si el archivo está corrupto, se limpia de forma automática
                 if df_log.empty or not all(col in df_log.columns for col in columnas_requeridas):
                     os.remove(ARCHIVO_BITACORA)
                     df_log = pd.DataFrame(columns=columnas_requeridas)
