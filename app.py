@@ -292,35 +292,52 @@ with tab_profesor:
         if os.path.exists(ARCHIVO_BITACORA):
             df_log = None
             try:
-                # Lectura limpia del estándar de 3 columnas fijas
+                # Intento de lectura estándar usando el parseador nativo de Pandas
                 df_log = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
+                # Si por alguna razón leyó columnas desalineadas, forzamos la corrección de estructura
+                if len(df_log.columns) != 3:
+                    raise ValueError("Estructura de columnas desalineada")
             except Exception:
-                # Lógica de contingencia por si quedaran residuos antiguos desalineados
+                # LÓGICA DE CONTINGENCIA ROBUSTA: Parsing controlado celda por celda para limpiar filas viejas o corruptas
                 try:
                     filas_reparadas = []
-                    with open(ARCHIVO_BITACORA, "r", encoding="utf-8") as f:
-                        lineas = f.readlines()
-                    
-                    for i, linea in enumerate(lineas):
-                        if i == 0 or not linea.strip():
-                            continue
+                    with open(ARCHIVO_BITACORA, "r", encoding="utf-8", newline="") as f:
+                        lector_csv = csv.reader(f)
+                        cabecera = next(lector_csv, None)
                         
-                        partes = linea.split(",", 2)
-                        cuando = partes[0].strip() if len(partes) > 0 else ""
-                        pregunta = partes[1].strip() if len(partes) > 1 else ""
-                        respuesta = partes[2].strip() if len(partes) > 2 else "Línea previa"
-                        
-                        filas_reparadas.append({
-                            "Cuándo": cuando,
-                            "Qué preguntaron": pregunta,
-                            "Respuesta de Aura": respuesta
-                        })
+                        for fila in lector_csv:
+                            if not fila:
+                                continue
+                            
+                            # Si la fila tiene la estructura correcta de 3 elementos
+                            if len(fila) == 3:
+                                cuando, pregunta, respuesta = fila[0], fila[1], fila[2]
+                            # Si es una fila antigua de 2 elementos
+                            elif len(fila) == 2:
+                                cuando, pregunta, respuesta = fila[0], fila[1], "No registrada (Bitácora anterior)"
+                            # Si la fila se fragmentó de más debido a las comas sueltas históricas
+                            elif len(fila) > 3:
+                                cuando = fila[0]
+                                pregunta = fila[1]
+                                # Recomponer el remanente de texto fragmentado para que no salte de columna
+                                respuesta = ", ".join(fila[2:])
+                            else:
+                                cuando = fila[0] if len(fila) > 0 else ""
+                                pregunta = "Consulta no estructurada"
+                                respuesta = "No registrada"
+                                
+                            filas_reparadas.append({
+                                "Cuándo": cuando.strip(),
+                                "Qué preguntaron": pregunta.strip(),
+                                "Respuesta de Aura": respuesta.strip()
+                            })
                     
                     if filas_reparadas:
                         df_log = pd.DataFrame(filas_reparadas)[["Cuándo", "Qué preguntaron", "Respuesta de Aura"]]
+                        # Reescribir el archivo local bajo un formato estrictamente estandarizado
                         df_log.to_csv(ARCHIVO_BITACORA, index=False, encoding='utf-8', quoting=csv.QUOTE_MINIMAL)
                 except Exception as e_reparacion:
-                    st.error(f"Error en procesamiento: {e_reparacion}")
+                    st.error(f"Error en procesamiento de contingencia: {e_reparacion}")
 
             if df_log is not None and not df_log.empty:
                 st.dataframe(df_log.iloc[::-1], use_container_width=True)
