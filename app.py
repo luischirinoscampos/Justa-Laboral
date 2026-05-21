@@ -34,7 +34,7 @@ def reiniciar_conversacion():
                 "Pertenezco al **Ecosistema Digital de Aprendizaje (EDA)** de esta unidad curricular, "
                 "creada y desarrollada por el **Prof. Luis Ignacio Chirinos Campos**.\n\n"
                 "Estoy aquí para acompañarte en tu **aprendizaje** con claridad, calidez y rigor jurídico.\n\n"
-                "🔴 **¿Qué puedo hacer por ti?**\n"
+                "🔑 **¿Qué puedo hacer por ti?**\n"
                 "- Resolver dudas sobre los contenidos de la unidad\n"
                 "- Explicar conceptos jurídicos complejos de forma sencilla\n"
                 "- Ayudarte a preparar tus estudios\n"
@@ -189,23 +189,41 @@ st.markdown("""
         border-radius: 12px !important;
     }
     
-    /* Botón de reinicio (derecha) - normal */
-    .reinicio-btn button {
-        background-color: #0A2540 !important;
-        color: white !important;
-        border-radius: 8px !important;
+    /* Fila de botones */
+    .botones-fila {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
     }
     
-    /* Botón de profesor (izquierda) - discreto */
+    /* Botón de profesor (izquierda) - solo icono */
     .profesor-btn button {
         background-color: transparent !important;
         color: #4A5568 !important;
-        font-size: 1rem !important;
+        font-size: 1.3rem !important;
         padding: 4px 12px !important;
         box-shadow: none !important;
         border: 1px solid #CBD5E1 !important;
+        min-width: auto !important;
     }
     .profesor-btn button:hover {
+        color: #0A2540 !important;
+        background-color: #F8FAFC !important;
+        border-color: #0A2540 !important;
+    }
+    
+    /* Botón de reinicio (derecha) - solo icono */
+    .reinicio-btn button {
+        background-color: transparent !important;
+        color: #4A5568 !important;
+        font-size: 1.3rem !important;
+        padding: 4px 12px !important;
+        box-shadow: none !important;
+        border: 1px solid #CBD5E1 !important;
+        min-width: auto !important;
+    }
+    .reinicio-btn button:hover {
         color: #0A2540 !important;
         background-color: #F8FAFC !important;
         border-color: #0A2540 !important;
@@ -247,14 +265,12 @@ if "profesor_autenticado" not in st.session_state:
     st.session_state.profesor_autenticado = False
 
 # ==========================================
-# 9. BARRA SUPERIOR CON BOTONES POSICIONADOS
+# 9. FILA DE BOTONES (SOLO ICONOS)
 # ==========================================
-# Usamos layout de columnas: [1] Profesor | [8] espacio | [1] Reinicio
-col_izq, col_centro, col_der = st.columns([1, 8, 1])
-
+col_izq, col_der = st.columns([1, 1])
 with col_izq:
     st.markdown('<div class="profesor-btn">', unsafe_allow_html=True)
-    if st.button("🔒 Profesor", key="btn_profesor", help="Acceso para profesores"):
+    if st.button("🔒", key="btn_profesor", help="Acceso profesor"):
         st.session_state.show_profesor = not st.session_state.show_profesor
         st.session_state.profesor_autenticado = False
         st.rerun()
@@ -262,7 +278,7 @@ with col_izq:
 
 with col_der:
     st.markdown('<div class="reinicio-btn">', unsafe_allow_html=True)
-    if st.button("🔄 Reiniciar", key="btn_reinicio", help="Reiniciar conversación"):
+    if st.button("🔄", key="btn_reinicio", help="Reiniciar conversación"):
         reiniciar_conversacion()
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
