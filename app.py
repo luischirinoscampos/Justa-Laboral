@@ -150,8 +150,17 @@ st.markdown("""
         border-radius: 12px !important;
     }
     
-    /* Estilo para el botón de la izquierda */
-    div[data-testid="column"]:first-child .stButton button {
+    /* Contenedor de la fila de botones */
+    .botones-fila {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        margin-bottom: 15px;
+    }
+    
+    /* Botón izquierdo (candado) */
+    .btn-izquierda button {
         background-color: transparent !important;
         color: #4A5568 !important;
         font-size: 1.3rem !important;
@@ -160,14 +169,18 @@ st.markdown("""
         border-radius: 8px !important;
         box-shadow: none !important;
     }
-    div[data-testid="column"]:first-child .stButton button:hover {
+    .btn-izquierda button:hover {
         color: #0A2540 !important;
         background-color: #F8FAFC !important;
         border-color: #0A2540 !important;
     }
     
-    /* Estilo para el botón de la derecha */
-    div[data-testid="column"]:last-child .stButton button {
+    /* Botón derecho (reinicio) */
+    .btn-derecha {
+        display: flex;
+        justify-content: flex-end;
+    }
+    .btn-derecha button {
         background-color: transparent !important;
         color: #4A5568 !important;
         font-size: 1.3rem !important;
@@ -175,9 +188,8 @@ st.markdown("""
         border: 1px solid #CBD5E1 !important;
         border-radius: 8px !important;
         box-shadow: none !important;
-        float: right !important;
     }
-    div[data-testid="column"]:last-child .stButton button:hover {
+    .btn-derecha button:hover {
         color: #0A2540 !important;
         background-color: #F8FAFC !important;
         border-color: #0A2540 !important;
@@ -226,11 +238,22 @@ if "profesor_autenticado" not in st.session_state:
     st.session_state.profesor_autenticado = False
 
 # ==========================================
-# 9. BOTONES SUPERIORES (EN EXTREMOS)
+# 9. BOTONES SUPERIORES (USANDO HTML PARA EXTREMOS)
 # ==========================================
+# Usamos contenedor flex con justify-content: space-between
+st.markdown("""
+    <div class="botones-fila">
+        <div class="btn-izquierda" id="btn-candado"></div>
+        <div class="btn-derecha" id="btn-reinicio"></div>
+    </div>
+""", unsafe_allow_html=True)
+
+# Streamlit no permite insertar botones dentro de HTML puro,
+# así que usamos columnas con la misma clase CSS
 col_izq, col_der = st.columns([1, 20])
 
 with col_izq:
+    st.markdown('<div class="btn-izquierda">', unsafe_allow_html=True)
     if st.button("🔒", key="btn_profesor", help="Acceso profesor"):
         if st.session_state.modo_profesor:
             st.session_state.modo_profesor = False
@@ -239,11 +262,14 @@ with col_izq:
             st.session_state.modo_profesor = True
             st.session_state.profesor_autenticado = False
         st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 with col_der:
+    st.markdown('<div class="btn-derecha">', unsafe_allow_html=True)
     if st.button("🔄", key="btn_reinicio", help="Reiniciar conversación"):
         reiniciar_conversacion()
         st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -380,22 +406,24 @@ else:
     st.markdown("## 📋 Panel del Profesor")
     
     if not st.session_state.profesor_autenticado:
-        st.markdown("### 🔐 Acceso restringido")
-        clave = st.text_input("Ingrese la credencial docente:", type="password", key="profesor_clave")
+        # Solicitar credenciales de forma discreta (sin "acceso restringido")
+        clave = st.text_input("Credencial docente:", type="password", key="profesor_clave")
         if clave:
             if clave == "UCLA2026":
                 st.session_state.profesor_autenticado = True
-                st.success("✅ Acceso concedido. Cargando bitácora...")
+                st.success("✅ Acceso concedido")
                 st.rerun()
             else:
-                st.error("❌ Credencial incorrecta. Acceso denegado.")
+                st.error("❌ Credencial incorrecta")
         
+        # Botón para volver al chat
         if st.button("← Volver al chat", key="volver_chat"):
             st.session_state.modo_profesor = False
             st.session_state.profesor_autenticado = False
             st.rerun()
     
     else:
+        # Mostrar métricas
         st.markdown("### 📊 Bitácora de Consultas")
         
         if os.path.exists(ARCHIVO_BITACORA):
