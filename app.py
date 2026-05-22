@@ -150,6 +150,7 @@ st.markdown("""
         border-radius: 12px !important;
     }
     
+    /* Estilo base para botones */
     .stButton button {
         background-color: transparent !important;
         color: #4A5568 !important;
@@ -165,6 +166,18 @@ st.markdown("""
         color: #0A2540 !important;
         background-color: #F8FAFC !important;
         border-color: #0A2540 !important;
+    }
+    
+    /* Forzar primera columna a la izquierda */
+    div[data-testid="column"]:first-child {
+        display: flex;
+        justify-content: flex-start;
+    }
+    
+    /* Forzar última columna a la derecha */
+    div[data-testid="column"]:last-child {
+        display: flex;
+        justify-content: flex-end;
     }
     
     #MainMenu, footer, header, [data-testid="stToolbar"] {
@@ -210,9 +223,9 @@ if "profesor_autenticado" not in st.session_state:
     st.session_state.profesor_autenticado = False
 
 # ==========================================
-# 9. BOTONES SUPERIORES (EN EXTREMOS - CORREGIDO)
+# 9. BOTONES SUPERIORES (FORZADO CON CSS)
 # ==========================================
-col_izq, col_centro, col_der = st.columns([1, 18, 1])
+col_izq, col_der = st.columns([1, 20])
 
 with col_izq:
     if st.button("🔒", key="btn_profesor", help="Acceso profesor"):
@@ -228,8 +241,6 @@ with col_der:
     if st.button("🔄", key="btn_reinicio", help="Reiniciar conversación"):
         reiniciar_conversacion()
         st.rerun()
-
-# col_centro queda vacío (solo para empujar los botones a los extremos)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -259,10 +270,9 @@ if not st.session_state.modo_profesor:
         pregunta_lower = pregunta.lower()
         palabras_complejas = [
             "salario", "prestaciones", "contrato", "despido", "indemnización",
-            "vacaciones", "utilidades", "liquidación", "beneficios", "artículo",
-            "LOTTT", "artículo"
+            "vacaciones", "utilidades", "liquidación", "beneficios", "artículo"
         ]
-        palabras_cortas = ["qué es", "defina", "significa", "brevemente", "en dos líneas", "en una línea"]
+        palabras_cortas = ["qué es", "defina", "significa", "brevemente"]
         puntuacion = 0
         for palabra in palabras_complejas:
             if palabra in pregunta_lower:
@@ -294,7 +304,6 @@ REGLAS:
 - Usa **negritas** para conceptos clave.
 - NO ayudas a resolver exámenes o evaluaciones.
 - Usa SOLO Markdown estándar. NO uses fórmulas LaTeX ($$).
-- Si el estudiante te pide "explicación fácil" o "sin tecnicismos", usa un lenguaje sencillo, ejemplos cotidianos y evita tecnicismos complejos.
 """
     
     # ==========================================
@@ -335,7 +344,6 @@ REGLAS:
                 if not api_key:
                     st.error("Error: API Key no configurada.")
                 else:
-                    # Preparar historial y configuración ANTES del try (para reusar)
                     client = genai.Client(api_key=api_key)
                     history = []
                     for msg in st.session_state.messages[-4:]:
@@ -349,7 +357,6 @@ REGLAS:
                         max_output_tokens=max_tokens
                     )
                     
-                    # Reintentos silenciosos ante error 503
                     reintentos = 0
                     exito = False
                     respuesta_texto = None
@@ -367,21 +374,18 @@ REGLAS:
                             error_str = str(e)
                             reintentos += 1
                             if reintentos < 3 and ("503" in error_str or "UNAVAILABLE" in error_str or "RESOURCE_EXHAUSTED" in error_str or "429" in error_str):
-                                time.sleep(1)  # Espera silenciosa
-                                continue  # Reintentar
+                                time.sleep(1)
+                                continue
                             else:
-                                # Si es el último reintento o error diferente, mostrar mensaje amigable
                                 if "503" in error_str or "UNAVAILABLE" in error_str or "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
                                     respuesta_texto = "📚 **Aura está recibiendo muchas consultas en este momento.** Por favor, espera 1 minuto y vuelve a intentar. Tu pregunta es importante."
                                 else:
                                     respuesta_texto = f"⚠️ Error técnico: {error_str[:150]}"
-                                exito = True  # Salir del bucle con mensaje de error
+                                exito = True
                     
-                    # Mostrar respuesta (éxito o mensaje amigable)
                     st.markdown(respuesta_texto)
                     st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta_texto})
                     
-                    # Guardar en caché solo si fue una respuesta exitosa (no mensaje de error)
                     if respuesta_texto and not respuesta_texto.startswith(("📚", "⚠️")):
                         guardar_cache(prompt, respuesta_texto)
                     
