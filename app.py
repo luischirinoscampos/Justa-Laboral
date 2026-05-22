@@ -19,7 +19,7 @@ ARCHIVO_BITACORA = "consultas_local.csv"
 ARCHIVO_CONOCIMIENTO = "vector_store.json"
 
 # ==========================================
-# 2. FUNCIÓN PARA REINICIAR CONVERSACIÓN (VERSIÓN ULTRACORTA)
+# 2. FUNCIÓN PARA REINICIAR CONVERSACIÓN (AURA COMPLETA)
 # ==========================================
 def reiniciar_conversacion():
     st.session_state.messages = [
@@ -27,14 +27,18 @@ def reiniciar_conversacion():
             "role": "assistant",
             "avatar": "✨",
             "content": (
-                "📍 ¡Hola! Soy **Aura**, tu tutora de Derecho del Trabajo.\n\n"
-                "Pertenezco al **EDA** creado por el **Prof. Luis Ignacio Chirinos Campos**.\n\n"
-                "🛠️ **¿Cómo puedo apoyarte?**\n"
-                "- Aclarar dudas\n"
-                "- Explicar conceptos\n"
-                "- Guiar tu estudio\n\n"
-                "⚠️ No estoy habilitada para resolver exámenes.\n\n"
-                "¿Cuál es tu inquietud académica, por favor? 💬"
+                "📍 ¡Hola! Soy **Aura**, tu tutora académica en Derecho del Trabajo.\n\n"
+                "Pertenezco al **Ecosistema Digital de Aprendizaje (EDA)** de esta unidad curricular, "
+                "creada y desarrollada por el **Prof. Luis Ignacio Chirinos Campos**.\n\n"
+                "Estoy aquí para acompañarte en tu **aprendizaje** con claridad, calidez y rigor jurídico.\n\n"
+                "🛠️ **¿Qué puedo hacer por ti?**\n"
+                "- Resolver dudas sobre los contenidos de la unidad\n"
+                "- Explicar conceptos jurídicos complejos de forma sencilla\n"
+                "- Ayudarte a preparar tus estudios\n"
+                "- Orientarte en casos prácticos\n\n"
+                "⚠️ **Importante**: No puedo ayudarte a resolver exámenes o evaluaciones. "
+                "Mi propósito es apoyar tu **aprendizaje genuino**, no proporcionar atajos académicos.\n\n"
+                "Cuéntame, ¿qué tema o consulta académica te trae hoy? 💬"
             )
         }
     ]
@@ -100,7 +104,7 @@ def registrar_consulta(pregunta: str, respuesta: str):
         pass
 
 # ==========================================
-# 6. ESTILOS CSS (header ultracompacto + sin sidebar)
+# 6. ESTILOS CSS (preservando la esencia visual)
 # ==========================================
 st.markdown("""
     <style>
@@ -114,39 +118,43 @@ st.markdown("""
         color: #0A2540 !important;
     }
     
-    /* Header ultracompacto */
+    /* Header con identidad */
     .custom-header {
         text-align: center;
-        margin-bottom: 5px;
-        padding-bottom: 0px;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #E2E8F0;
     }
     .line-1 {
-        font-size: 1.5rem;
+        font-size: 2rem;
         font-weight: 700;
         color: #0A2540 !important;
         margin-bottom: 0px;
     }
     .line-2 {
-        font-size: 0.8rem;
+        font-size: 1rem;
         font-weight: 500;
         color: #1A3A5C !important;
     }
     .line-3 {
-        font-size: 0.7rem;
+        font-size: 0.85rem;
         color: #4A5568 !important;
     }
+    .line-4 {
+        font-size: 0.75rem;
+        color: #4A5568 !important;
+        margin-top: 5px;
+    }
     
-    /* Ocultar sidebar */
+    /* Ocultar sidebar y elementos de Streamlit */
     [data-testid="stSidebar"] {
         display: none !important;
     }
-    
-    /* Ocultar elementos de Streamlit */
     #MainMenu, footer, header, [data-testid="stToolbar"] {
         display: none !important;
     }
     
-    /* Input del chat más compacto */
+    /* Input del chat */
     [data-testid="stChatInput"] > div {
         background-color: #F8FAFC !important;
         border: 1px solid #CBD5E1 !important;
@@ -178,13 +186,14 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 7. HEADER ULTRACOMPACTO (sin desarrollador)
+# 7. ENCABEZADO COMPLETO (con desarrollador)
 # ==========================================
 st.markdown("""
     <div class="custom-header">
-        <div class="line-1">Aura</div>
+        <div class="line-1">✨ Aura</div>
         <div class="line-2">Tutora Académica en Línea</div>
-        <div class="line-3">Derecho del Trabajo | EDA - UCLA</div>
+        <div class="line-3">Unidad Curricular: Derecho del Trabajo</div>
+        <div class="line-4">Desarrollador: Prof. Luis Ignacio Chirinos Campos</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -278,7 +287,7 @@ REGLAS:
 - Usa **negritas** para conceptos clave.
 - NO ayudas a resolver exámenes.
 - NO uses fórmulas LaTeX ($$).
-- Responde de forma CONCISA (máximo 3 párrafos).
+- Responde de forma CONCISA pero completa.
 """
     
     # ==========================================
@@ -299,7 +308,7 @@ REGLAS:
             
             with st.chat_message("assistant", avatar="✨"):
                 if es_intento_evaluacion(prompt):
-                    respuesta = "📚 **Lo siento, no puedo ayudarte con evaluaciones.**"
+                    respuesta = "📚 **Lo siento, no puedo ayudarte con evaluaciones.** Estoy para apoyar tu aprendizaje genuino."
                     st.markdown(respuesta)
                     st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta})
                     registrar_consulta(prompt, "[BLOQUEADO]")
@@ -310,6 +319,7 @@ REGLAS:
                     st.markdown(cache)
                     st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": cache})
                     registrar_consulta(prompt, "[CACHÉ]")
+                    st.info("⚡ Respuesta recuperada de memoria")
                     st.rerun()
                 
                 if not api_key:
