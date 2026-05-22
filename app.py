@@ -150,7 +150,6 @@ st.markdown("""
         border-radius: 12px !important;
     }
     
-    /* Estilo para ambos botones (mismo tamaño) */
     .stButton button {
         background-color: transparent !important;
         color: #4A5568 !important;
@@ -166,6 +165,11 @@ st.markdown("""
         color: #0A2540 !important;
         background-color: #F8FAFC !important;
         border-color: #0A2540 !important;
+    }
+    
+    div[data-testid="column"]:last-child {
+        display: flex;
+        justify-content: flex-end;
     }
     
     #MainMenu, footer, header, [data-testid="stToolbar"] {
@@ -188,7 +192,7 @@ st.markdown("""
 # ==========================================
 st.markdown("""
     <div class="custom-header">
-        <div class="line-1">Aura</div>
+        <div class="line-1">✨ Aura</div>
         <div class="line-2">Tutora Académica en Línea</div>
         <div class="line-3">Unidad Curricular: Derecho del Trabajo</div>
         <div class="line-4">Desarrollador: Prof. Luis Ignacio Chirinos Campos</div>
@@ -211,11 +215,9 @@ if "profesor_autenticado" not in st.session_state:
     st.session_state.profesor_autenticado = False
 
 # ==========================================
-# 9. BOTONES SUPERIORES (EN EXTREMOS CON TRES COLUMNAS)
+# 9. BOTONES SUPERIORES
 # ==========================================
-# Usamos tres columnas: izquierda (1), centro (18), derecha (1)
-# Esto fuerza el botón izquierdo a la izquierda y el derecho a la derecha
-col_izq, col_centro, col_der = st.columns([1, 18, 1])
+col_izq, col_der = st.columns([1, 20])
 
 with col_izq:
     if st.button("🔒", key="btn_profesor", help="Acceso profesor"):
@@ -231,8 +233,6 @@ with col_der:
     if st.button("🔄", key="btn_reinicio", help="Reiniciar conversación"):
         reiniciar_conversacion()
         st.rerun()
-
-# La columna centro queda vacía (solo para empujar los botones a los extremos)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -295,12 +295,13 @@ REGLAS:
 - Responde con claridad, calidez y rigor jurídico.
 - Usa **negritas** para conceptos clave.
 - NO ayudas a resolver exámenes o evaluaciones.
+- Usa SOLO Markdown estándar. NO uses fórmulas LaTeX ($$).
 """
     
     # ==========================================
-    # 14. PROCESAMIENTO DEL CHAT
+    # 14. PROCESAMIENTO DEL CHAT (CON REINTENTOS SILENCIOSOS)
     # ==========================================
-    prompt = st.chat_input("Escribe tu consulta académica aquí...")
+    prompt = st.chat_input("Escribe tu consulta jurídica aquí...")
     
     if prompt:
         tiempo_actual = time.time()
@@ -314,6 +315,7 @@ REGLAS:
             st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
             
             with st.chat_message("assistant", avatar="✨"):
+                # Bloqueo de evaluaciones
                 if es_intento_evaluacion(prompt):
                     respuesta = "📚 **Lo siento, no puedo ayudarte con evaluaciones.** Estoy para apoyar tu aprendizaje."
                     st.markdown(respuesta)
@@ -321,45 +323,70 @@ REGLAS:
                     registrar_consulta(prompt, "[BLOQUEADO]")
                     st.stop()
                 
+                # Verificar caché
                 cache = obtener_cache(prompt)
                 if cache:
                     st.markdown(cache)
                     st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": cache})
                     registrar_consulta(prompt, "[CACHÉ]")
+                    st.info("⚡ Respuesta recuperada de memoria")
                     st.rerun()
                 
+                # Llamar a Gemini con reintentos silenciosos
                 if not api_key:
                     st.error("Error: API Key no configurada.")
                 else:
-                    try:
-                        client = genai.Client(api_key=api_key)
-                        history = []
-                        for msg in st.session_state.messages[-4:]:
-                            role = "model" if msg["role"] == "assistant" else "user"
-                            history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
-                        
-                        config = types.GenerateContentConfig(
-                            system_instruction=get_system_instruction(),
-                            temperature=0.2,
-                            max_output_tokens=calcular_max_tokens(prompt)
-                        )
-                        
-                        response = client.models.generate_content(
-                            model='gemini-2.5-flash',
-                            contents=history,
-                            config=config
-                        )
-                        
-                        respuesta_texto = response.text
-                        st.markdown(respuesta_texto)
-                        st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta_texto})
+                    # Preparar historial y configuración ANTES del try (para reusar)
+                    client = genai.Client(api_key=api_key)
+                    history = []
+                    for msg in st.session_state.messages[-4:]:
+                        role = "model" if msg["role"] == "assistant" else "user"
+                        history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
+                    
+                    max_tokens = calcular_max_tokens(prompt)
+                    config = types.GenerateContentConfig(
+                        system_instruction=get_system_instruction(),
+                        temperature=0.2,
+                        max_output_tokens=max_tokens
+                    )
+                    
+                    # Reintentos silenciosos ante error 503
+                    reintentos = 0
+                    exito = False
+                    respuesta_texto = None
+                    
+                    while reintentos < 3 and not exito:
+                        try:
+                            response = client.models.generate_content(
+                                model='gemini-2.5-flash',
+                                contents=history,
+                                config=config
+                            )
+                            respuesta_texto = response.text
+                            exito = True
+                        except Exception as e:
+                            error_str = str(e)
+                            reintentos += 1
+                            if reintentos < 3 and ("503" in error_str or "UNAVAILABLE" in error_str or "RESOURCE_EXHAUSTED" in error_str or "429" in error_str):
+                                time.sleep(1)  # Espera silenciosa
+                                continue  # Reintentar
+                            else:
+                                # Si es el último reintento o error diferente, mostrar mensaje amigable
+                                if "503" in error_str or "UNAVAILABLE" in error_str or "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
+                                    respuesta_texto = "📚 **Aura está recibiendo muchas consultas en este momento.** Por favor, espera 1 minuto y vuelve a intentar. Tu pregunta es importante."
+                                else:
+                                    respuesta_texto = f"⚠️ Error técnico: {error_str[:150]}"
+                                exito = True  # Salir del bucle con mensaje de error
+                    
+                    # Mostrar respuesta (éxito o mensaje amigable)
+                    st.markdown(respuesta_texto)
+                    st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta_texto})
+                    
+                    # Guardar en caché solo si fue una respuesta exitosa (no mensaje de error)
+                    if respuesta_texto and not respuesta_texto.startswith(("📚", "⚠️")):
                         guardar_cache(prompt, respuesta_texto)
-                        registrar_consulta(prompt, respuesta_texto)
-                        
-                    except Exception as e:
-                        error_msg = "📚 Aura está recibiendo muchas consultas. Espera un momento." if "RESOURCE_EXHAUSTED" in str(e) else f"⚠️ Error: {str(e)[:150]}"
-                        st.error(error_msg)
-                        registrar_consulta(prompt, error_msg)
+                    
+                    registrar_consulta(prompt, respuesta_texto)
 
 # ==========================================
 # 15. MODO PROFESOR (CHAT OCULTO)
@@ -391,12 +418,11 @@ else:
                 df = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
                 if not df.empty:
                     st.dataframe(df.iloc[::-1], use_container_width=True)
-                    
                     csv_data = df.to_csv(index=False).encode('utf-8')
                     st.download_button(
                         label="📥 Descargar bitácora (CSV)",
                         data=csv_data,
-                        file_name=f"aura_bitacora_{datetime.now().strftime('%d_m_%Y_%H%M')}.csv",
+                        file_name=f"aura_bitacora_{datetime.now().strftime('%d_%m_%Y_%H%M')}.csv",
                         mime="text/csv"
                     )
                     
@@ -412,7 +438,6 @@ else:
                     st.markdown("---")
                     st.markdown("### 🕐 Últimas 5 consultas")
                     st.dataframe(df.tail(5), use_container_width=True)
-                    
                 else:
                     st.info("📭 La bitácora está vacía.")
             except Exception as e:
