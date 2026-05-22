@@ -33,8 +33,8 @@ def reiniciar_conversacion():
                 "- Aclarar dudas\n"
                 "- Explicar conceptos\n"
                 "- Guiar tu estudio\n\n"
-                "⚠️ No resuelvo exámenes.\n\n"
-                "¿Cuál es tu inquietud académica? 💬"
+                "⚠️ No estoy habilitada para resolver exámenes.\n\n"
+                "¿Cuál es tu inquietud académica, por favor? 💬"
             )
         }
     ]
@@ -182,7 +182,7 @@ st.markdown("""
 # ==========================================
 st.markdown("""
     <div class="custom-header">
-        <div class="line-1">✨ Aura</div>
+        <div class="line-1">Aura</div>
         <div class="line-2">Tutora Académica en Línea</div>
         <div class="line-3">Derecho del Trabajo | EDA - UCLA</div>
     </div>
