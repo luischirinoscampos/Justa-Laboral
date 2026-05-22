@@ -167,11 +167,6 @@ st.markdown("""
         border-color: #0A2540 !important;
     }
     
-    div[data-testid="column"]:last-child {
-        display: flex;
-        justify-content: flex-end;
-    }
-    
     #MainMenu, footer, header, [data-testid="stToolbar"] {
         visibility: hidden !important;
         display: none !important;
@@ -192,7 +187,7 @@ st.markdown("""
 # ==========================================
 st.markdown("""
     <div class="custom-header">
-        <div class="line-1">Aura</div>
+        <div class="line-1">✨ Aura</div>
         <div class="line-2">Tutora Académica en Línea</div>
         <div class="line-3">Unidad Curricular: Derecho del Trabajo</div>
         <div class="line-4">Desarrollador: Prof. Luis Ignacio Chirinos Campos</div>
@@ -215,9 +210,9 @@ if "profesor_autenticado" not in st.session_state:
     st.session_state.profesor_autenticado = False
 
 # ==========================================
-# 9. BOTONES SUPERIORES
+# 9. BOTONES SUPERIORES (EN EXTREMOS - CORREGIDO)
 # ==========================================
-col_izq, col_der = st.columns([1, 20])
+col_izq, col_centro, col_der = st.columns([1, 18, 1])
 
 with col_izq:
     if st.button("🔒", key="btn_profesor", help="Acceso profesor"):
@@ -233,6 +228,8 @@ with col_der:
     if st.button("🔄", key="btn_reinicio", help="Reiniciar conversación"):
         reiniciar_conversacion()
         st.rerun()
+
+# col_centro queda vacío (solo para empujar los botones a los extremos)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -262,9 +259,10 @@ if not st.session_state.modo_profesor:
         pregunta_lower = pregunta.lower()
         palabras_complejas = [
             "salario", "prestaciones", "contrato", "despido", "indemnización",
-            "vacaciones", "utilidades", "liquidación", "beneficios", "artículo"
+            "vacaciones", "utilidades", "liquidación", "beneficios", "artículo",
+            "LOTTT", "artículo"
         ]
-        palabras_cortas = ["qué es", "defina", "significa", "brevemente"]
+        palabras_cortas = ["qué es", "defina", "significa", "brevemente", "en dos líneas", "en una línea"]
         puntuacion = 0
         for palabra in palabras_complejas:
             if palabra in pregunta_lower:
@@ -296,6 +294,7 @@ REGLAS:
 - Usa **negritas** para conceptos clave.
 - NO ayudas a resolver exámenes o evaluaciones.
 - Usa SOLO Markdown estándar. NO uses fórmulas LaTeX ($$).
+- Si el estudiante te pide "explicación fácil" o "sin tecnicismos", usa un lenguaje sencillo, ejemplos cotidianos y evita tecnicismos complejos.
 """
     
     # ==========================================
