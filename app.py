@@ -103,63 +103,55 @@ def registrar_consulta(pregunta: str, respuesta: str):
         pass
 
 # ==========================================
-# 6. ESTILOS CSS
+# 6. ESTILOS CSS LIMPIOS
 # ==========================================
 st.markdown("""
     <style>
-    html, body, .stApp, .stAppViewContainer, .main, .block-container,
-    [data-testid="stAppViewContainer"], .stChatMessage,
-    [data-testid="stChatMessage"], [data-testid="stChatMessageContent"] {
+    /* Fondo blanco */
+    html, body, .stApp, .stAppViewContainer, .main, .block-container {
         background-color: #FFFFFF !important;
-        background: #FFFFFF !important;
     }
     
+    /* Texto azul oscuro */
     p, span, li, label, .stMarkdown, h1, h2, h3, h4, div {
         color: #0A2540 !important;
     }
     
+    /* Header simple */
     .custom-header {
         text-align: center;
-        margin-bottom: 25px;
-        padding-bottom: 10px;
-        border-bottom: 2px solid #0A2540;
+        margin-bottom: 20px;
     }
     .line-1 {
-        font-size: 2.5rem;
+        font-size: 2rem;
         font-weight: 700;
         color: #0A2540 !important;
     }
     .line-2 {
-        font-size: 1.2rem;
-        font-weight: 600;
+        font-size: 1rem;
+        font-weight: 500;
         color: #1A3A5C !important;
     }
     .line-3 {
-        font-size: 0.95rem;
-        color: #4A5568 !important;
-    }
-    .line-4 {
         font-size: 0.85rem;
         color: #4A5568 !important;
-        margin-top: 5px;
     }
     
+    /* Input del chat */
     [data-testid="stChatInput"] > div {
         background-color: #F8FAFC !important;
         border: 1px solid #CBD5E1 !important;
         border-radius: 12px !important;
     }
     
+    /* Botones */
     .stButton button {
         background-color: transparent !important;
         color: #4A5568 !important;
-        font-size: 1.3rem !important;
+        font-size: 1.2rem !important;
         padding: 4px 12px !important;
         border: 1px solid #CBD5E1 !important;
         border-radius: 8px !important;
-        box-shadow: none !important;
-        min-width: 48px !important;
-        height: 38px !important;
     }
     .stButton button:hover {
         color: #0A2540 !important;
@@ -167,30 +159,28 @@ st.markdown("""
         border-color: #0A2540 !important;
     }
     
+    /* Ocultar elementos de Streamlit */
     #MainMenu, footer, header, [data-testid="stToolbar"] {
-        visibility: hidden !important;
         display: none !important;
     }
     
+    /* Panel del profesor */
     .panel-profesor {
-        margin-top: 20px;
+        margin-top: 30px;
         padding: 20px;
-        border: 1px solid #E2E8F0;
-        border-radius: 12px;
-        background-color: #FFFFFF;
+        border-top: 2px solid #E2E8F0;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 7. ENCABEZADO VISUAL
+# 7. HEADER SIMPLE (SIN ICONO EXTRA)
 # ==========================================
 st.markdown("""
     <div class="custom-header">
-        <div class="line-1">✨ Aura</div>
+        <div class="line-1">Aura</div>
         <div class="line-2">Tutora Académica en Línea</div>
-        <div class="line-3">Unidad Curricular: Derecho del Trabajo</div>
-        <div class="line-4">Desarrollador: Prof. Luis Ignacio Chirinos Campos</div>
+        <div class="line-3">Derecho del Trabajo | EDA - UCLA</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -210,12 +200,12 @@ if "profesor_autenticado" not in st.session_state:
     st.session_state.profesor_autenticado = False
 
 # ==========================================
-# 9. BOTONES SUPERIORES (EN EXTREMOS - TRES COLUMNAS)
+# 9. BOTONES EN EXTREMOS (TRES COLUMNAS)
 # ==========================================
-col_izq, col_centro, col_der = st.columns([1, 18, 1])
+col_izq, col_centro, col_der = st.columns([1, 10, 1])
 
 with col_izq:
-    if st.button("🔒", key="btn_profesor", help="Acceso profesor"):
+    if st.button("🔒", key="profesor_btn"):
         if st.session_state.modo_profesor:
             st.session_state.modo_profesor = False
             st.session_state.profesor_autenticado = False
@@ -225,18 +215,17 @@ with col_izq:
         st.rerun()
 
 with col_der:
-    if st.button("🔄", key="btn_reinicio", help="Reiniciar conversación"):
+    if st.button("🔄", key="reinicio_btn"):
         reiniciar_conversacion()
         st.rerun()
-
-# col_centro queda vacío
 
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ==========================================
-# 10. MODO NORMAL (CHAT VISIBLE)
+# 10. MODO NORMAL (CHAT)
 # ==========================================
 if not st.session_state.modo_profesor:
+    # Mostrar mensajes
     for message in st.session_state.messages:
         with st.chat_message(message["role"], avatar=message.get("avatar")):
             st.markdown(message["content"])
@@ -245,8 +234,8 @@ if not st.session_state.modo_profesor:
     # 11. DETECCIÓN DE EVALUACIONES
     # ==========================================
     PALABRAS_EVALUACION = [
-        "examen", "evaluación", "prueba", "cuestionario", "respuesta del examen",
-        "dame la respuesta", "cuál es la opción", "qué pongo", "respuesta correcta"
+        "examen", "evaluación", "prueba", "cuestionario",
+        "dame la respuesta", "cuál es la opción", "respuesta correcta"
     ]
     
     def es_intento_evaluacion(pregunta: str) -> bool:
@@ -257,23 +246,18 @@ if not st.session_state.modo_profesor:
     # ==========================================
     def calcular_max_tokens(pregunta: str) -> int:
         pregunta_lower = pregunta.lower()
-        palabras_complejas = [
-            "salario", "prestaciones", "contrato", "despido", "indemnización",
-            "vacaciones", "utilidades", "liquidación", "beneficios", "artículo"
-        ]
-        palabras_cortas = ["qué es", "defina", "significa", "brevemente"]
-        puntuacion = 0
-        for palabra in palabras_complejas:
-            if palabra in pregunta_lower:
-                puntuacion += 2
-        for palabra in palabras_cortas:
-            if palabra in pregunta_lower:
-                puntuacion -= 2
-        if len(pregunta) > 150:
-            puntuacion += 1
-        if puntuacion >= 2:
+        palabras_largas = ["salario", "prestaciones", "contrato", "vacaciones", "utilidades"]
+        palabras_cortas = ["qué es", "defina", "brevemente", "dos líneas"]
+        puntos = 0
+        for p in palabras_largas:
+            if p in pregunta_lower:
+                puntos += 2
+        for p in palabras_cortas:
+            if p in pregunta_lower:
+                puntos -= 1
+        if puntos >= 2:
             return 4096
-        elif puntuacion <= -1:
+        elif puntos <= 0:
             return 1024
         else:
             return 2048
@@ -282,37 +266,37 @@ if not st.session_state.modo_profesor:
     # 13. SYSTEM INSTRUCTION
     # ==========================================
     def get_system_instruction():
-        return f"""
-Eres AURA, tutora de Derecho del Trabajo del EDA creado por el Prof. Luis Ignacio Chirinos Campos.
+        return f"""Eres Aura, tutora de Derecho del Trabajo.
 
-CONTEXTO DE CÁTEDRA:
+CONTEXTO:
 {CONTEXTO_BASE}
 
 REGLAS:
-- Responde con claridad, calidez y rigor jurídico.
+- Sé clara, cálida y pedagógica.
 - Usa **negritas** para conceptos clave.
-- NO ayudas a resolver exámenes o evaluaciones.
-- Usa SOLO Markdown estándar. NO uses fórmulas LaTeX ($$).
+- NO ayudas a resolver exámenes.
+- NO uses fórmulas LaTeX ($$). Usa solo Markdown normal.
+- Si te piden "explicación fácil", usa ejemplos cotidianos.
 """
     
     # ==========================================
-    # 14. PROCESAMIENTO DEL CHAT (CON REINTENTOS SILENCIOSOS)
+    # 14. INPUT Y PROCESAMIENTO
     # ==========================================
     prompt = st.chat_input("Escribe tu consulta jurídica aquí...")
     
     if prompt:
-        tiempo_actual = time.time()
-        if tiempo_actual - st.session_state.ultimo_envio < 15:
-            st.warning(f"⏳ Espera {int(15 - (tiempo_actual - st.session_state.ultimo_envio))} segundos.")
+        ahora = time.time()
+        if ahora - st.session_state.ultimo_envio < 15:
+            st.warning(f"⏳ Espera {int(15 - (ahora - st.session_state.ultimo_envio))} segundos.")
         else:
-            st.session_state.ultimo_envio = tiempo_actual
+            st.session_state.ultimo_envio = ahora
             
             with st.chat_message("user", avatar="👤"):
                 st.markdown(prompt)
             st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
             
             with st.chat_message("assistant", avatar="✨"):
-                # Bloqueo de evaluaciones
+                # Bloquear evaluación
                 if es_intento_evaluacion(prompt):
                     respuesta = "📚 **Lo siento, no puedo ayudarte con evaluaciones.** Estoy para apoyar tu aprendizaje."
                     st.markdown(respuesta)
@@ -326,123 +310,85 @@ REGLAS:
                     st.markdown(cache)
                     st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": cache})
                     registrar_consulta(prompt, "[CACHÉ]")
-                    st.info("⚡ Respuesta recuperada de memoria")
                     st.rerun()
                 
-                # Llamar a Gemini con reintentos silenciosos
                 if not api_key:
                     st.error("Error: API Key no configurada.")
                 else:
-                    client = genai.Client(api_key=api_key)
-                    history = []
-                    for msg in st.session_state.messages[-4:]:
-                        role = "model" if msg["role"] == "assistant" else "user"
-                        history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
-                    
-                    max_tokens = calcular_max_tokens(prompt)
-                    config = types.GenerateContentConfig(
-                        system_instruction=get_system_instruction(),
-                        temperature=0.2,
-                        max_output_tokens=max_tokens
-                    )
-                    
-                    # REINTENTOS SILENCIOSOS ANTE ERROR 503
-                    reintentos = 0
-                    exito = False
-                    respuesta_texto = None
-                    
-                    while reintentos < 3 and not exito:
-                        try:
-                            response = client.models.generate_content(
-                                model='gemini-2.5-flash',
-                                contents=history,
-                                config=config
-                            )
-                            respuesta_texto = response.text
-                            exito = True
-                        except Exception as e:
-                            error_str = str(e)
-                            reintentos += 1
-                            if reintentos < 3 and ("503" in error_str or "UNAVAILABLE" in error_str or "RESOURCE_EXHAUSTED" in error_str or "429" in error_str):
-                                time.sleep(1)  # Espera silenciosa
-                                continue  # Reintentar
-                            else:
-                                # Si es el último reintento o error diferente, mostrar mensaje amigable
-                                if "503" in error_str or "UNAVAILABLE" in error_str or "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
-                                    respuesta_texto = "📚 **Aura está recibiendo muchas consultas en este momento.** Por favor, espera 1 minuto y vuelve a intentar. Tu pregunta es importante."
+                    try:
+                        client = genai.Client(api_key=api_key)
+                        history = []
+                        for msg in st.session_state.messages[-4:]:
+                            role = "model" if msg["role"] == "assistant" else "user"
+                            history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
+                        
+                        max_tokens = calcular_max_tokens(prompt)
+                        config = types.GenerateContentConfig(
+                            system_instruction=get_system_instruction(),
+                            temperature=0.2,
+                            max_output_tokens=max_tokens
+                        )
+                        
+                        # Reintentos silenciosos
+                        respuesta_texto = None
+                        for intento in range(3):
+                            try:
+                                response = client.models.generate_content(
+                                    model='gemini-2.5-flash',
+                                    contents=history,
+                                    config=config
+                                )
+                                respuesta_texto = response.text
+                                break
+                            except Exception as e:
+                                if intento < 2 and ("503" in str(e) or "UNAVAILABLE" in str(e)):
+                                    time.sleep(1)
                                 else:
-                                    respuesta_texto = f"⚠️ Error técnico: {error_str[:150]}"
-                                exito = True  # Salir del bucle con mensaje de error
-                    
-                    # Mostrar respuesta (éxito o mensaje amigable)
-                    st.markdown(respuesta_texto)
-                    st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta_texto})
-                    
-                    # Guardar en caché solo si fue una respuesta exitosa (no mensaje de error)
-                    if respuesta_texto and not respuesta_texto.startswith(("📚", "⚠️")):
-                        guardar_cache(prompt, respuesta_texto)
-                    
-                    registrar_consulta(prompt, respuesta_texto)
+                                    respuesta_texto = "📚 **Aura está recibiendo muchas consultas.** Espera 1 minuto e intenta de nuevo."
+                        
+                        st.markdown(respuesta_texto)
+                        st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta_texto})
+                        
+                        if respuesta_texto and not respuesta_texto.startswith("📚"):
+                            guardar_cache(prompt, respuesta_texto)
+                        
+                        registrar_consulta(prompt, respuesta_texto)
+                        
+                    except Exception as e:
+                        st.error(f"Error: {str(e)[:100]}")
+                        registrar_consulta(prompt, f"ERROR: {str(e)[:100]}")
 
 # ==========================================
-# 15. MODO PROFESOR (CHAT OCULTO)
+# 15. MODO PROFESOR
 # ==========================================
 else:
     st.markdown('<div class="panel-profesor">', unsafe_allow_html=True)
     st.markdown("## 📋 Panel del Profesor")
     
     if not st.session_state.profesor_autenticado:
-        clave = st.text_input("Credencial docente:", type="password", key="profesor_clave")
+        clave = st.text_input("Credencial docente:", type="password")
         if clave:
             if clave == "UCLA2026":
                 st.session_state.profesor_autenticado = True
-                st.success("✅ Acceso concedido")
                 st.rerun()
             else:
                 st.error("❌ Credencial incorrecta")
         
-        if st.button("← Volver al chat", key="volver_chat"):
+        if st.button("← Volver al chat"):
             st.session_state.modo_profesor = False
-            st.session_state.profesor_autenticado = False
             st.rerun()
-    
     else:
-        st.markdown("### 📊 Bitácora de Consultas")
-        
         if os.path.exists(ARCHIVO_BITACORA):
-            try:
-                df = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
-                if not df.empty:
-                    st.dataframe(df.iloc[::-1], use_container_width=True)
-                    csv_data = df.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label="📥 Descargar bitácora (CSV)",
-                        data=csv_data,
-                        file_name=f"aura_bitacora_{datetime.now().strftime('%d_%m_%Y_%H%M')}.csv",
-                        mime="text/csv"
-                    )
-                    
-                    st.markdown("---")
-                    st.markdown("### 📈 Estadísticas")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Total de consultas", len(df))
-                    with col2:
-                        bloqueos = df[df["Respuesta de Aura"].str.contains("BLOQUEADO", na=False)].shape[0] if "Respuesta de Aura" in df.columns else 0
-                        st.metric("Intentos bloqueados", bloqueos)
-                    
-                    st.markdown("---")
-                    st.markdown("### 🕐 Últimas 5 consultas")
-                    st.dataframe(df.tail(5), use_container_width=True)
-                else:
-                    st.info("📭 La bitácora está vacía.")
-            except Exception as e:
-                st.error(f"Error al leer la bitácora: {e}")
+            df = pd.read_csv(ARCHIVO_BITACORA, encoding='utf-8')
+            if not df.empty:
+                st.dataframe(df.iloc[::-1], use_container_width=True)
+                st.download_button("📥 Descargar CSV", df.to_csv(index=False).encode('utf-8'), "bitacora.csv")
+            else:
+                st.info("Bitácora vacía")
         else:
-            st.warning("📭 Aún no hay registros en la bitácora.")
+            st.info("Aún no hay registros")
         
-        st.markdown("---")
-        if st.button("🔒 Cerrar sesión y volver al chat", key="cerrar_sesion"):
+        if st.button("🔒 Cerrar sesión"):
             st.session_state.modo_profesor = False
             st.session_state.profesor_autenticado = False
             st.rerun()
