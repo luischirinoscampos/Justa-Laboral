@@ -19,7 +19,7 @@ ARCHIVO_BITACORA = "consultas_local.csv"
 ARCHIVO_CONOCIMIENTO = "vector_store.json"
 
 # ==========================================
-# 2. FUNCIÓN PARA REINICIAR CONVERSACIÓN (VERSIÓN BREVE Y CÁLIDA)
+# 2. FUNCIÓN PARA REINICIAR CONVERSACIÓN (VERSIÓN ULTRACORTA)
 # ==========================================
 def reiniciar_conversacion():
     st.session_state.messages = [
@@ -33,8 +33,8 @@ def reiniciar_conversacion():
                 "- Aclarar dudas\n"
                 "- Explicar conceptos\n"
                 "- Guiar tu estudio\n\n"
-                "⚠️ No resuelvo exámenes. Mi propósito es tu **aprendizaje genuino**.\n\n"
-                "Cuéntame, ¿qué inquietud académica te trae hoy? 💬"
+                "⚠️ No resuelvo exámenes.\n\n"
+                "¿Cuál es tu inquietud académica? 💬"
             )
         }
     ]
@@ -100,7 +100,7 @@ def registrar_consulta(pregunta: str, respuesta: str):
         pass
 
 # ==========================================
-# 6. ESTILOS CSS
+# 6. ESTILOS CSS (header ultracompacto + sin sidebar)
 # ==========================================
 st.markdown("""
     <style>
@@ -114,29 +114,39 @@ st.markdown("""
         color: #0A2540 !important;
     }
     
-    /* Header compacto */
+    /* Header ultracompacto */
     .custom-header {
         text-align: center;
-        margin-bottom: 10px;
-        padding-bottom: 5px;
+        margin-bottom: 5px;
+        padding-bottom: 0px;
     }
     .line-1 {
-        font-size: 1.8rem;
+        font-size: 1.5rem;
         font-weight: 700;
         color: #0A2540 !important;
         margin-bottom: 0px;
     }
     .line-2 {
-        font-size: 0.9rem;
+        font-size: 0.8rem;
         font-weight: 500;
         color: #1A3A5C !important;
     }
     .line-3 {
-        font-size: 0.75rem;
+        font-size: 0.7rem;
         color: #4A5568 !important;
     }
     
-    /* Input del chat */
+    /* Ocultar sidebar */
+    [data-testid="stSidebar"] {
+        display: none !important;
+    }
+    
+    /* Ocultar elementos de Streamlit */
+    #MainMenu, footer, header, [data-testid="stToolbar"] {
+        display: none !important;
+    }
+    
+    /* Input del chat más compacto */
     [data-testid="stChatInput"] > div {
         background-color: #F8FAFC !important;
         border: 1px solid #CBD5E1 !important;
@@ -158,11 +168,6 @@ st.markdown("""
         border-color: #0A2540 !important;
     }
     
-    /* Ocultar elementos */
-    #MainMenu, footer, header, [data-testid="stToolbar"] {
-        display: none !important;
-    }
-    
     /* Panel del profesor */
     .panel-profesor {
         margin-top: 20px;
@@ -173,7 +178,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 7. HEADER COMPACTO
+# 7. HEADER ULTRACOMPACTO (sin desarrollador)
 # ==========================================
 st.markdown("""
     <div class="custom-header">
@@ -184,20 +189,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 8. SIDEBAR CON CRÉDITOS
-# ==========================================
-with st.sidebar:
-    st.markdown("---")
-    st.caption("📌 **Desarrollador**")
-    st.caption("Prof. Luis Ignacio Chirinos Campos")
-    st.caption("UCLA - Decanato de Ciencias Económicas y Empresariales")
-    st.markdown("---")
-    st.caption(f"📅 {datetime.now().strftime('%d/%m/%Y')}")
-    st.caption("⚡ Respuestas basadas en material de la cátedra")
-    st.caption("⏱️ 15 segundos entre consultas")
-
-# ==========================================
-# 9. INICIALIZACIÓN
+# 8. INICIALIZACIÓN
 # ==========================================
 if "messages" not in st.session_state:
     reiniciar_conversacion()
@@ -212,7 +204,7 @@ if "profesor_autenticado" not in st.session_state:
     st.session_state.profesor_autenticado = False
 
 # ==========================================
-# 10. BOTONES EN EXTREMOS
+# 9. BOTONES EN EXTREMOS
 # ==========================================
 col_izq, col_centro, col_der = st.columns([1, 10, 1])
 
@@ -232,7 +224,7 @@ with col_der:
         st.rerun()
 
 # ==========================================
-# 11. MODO NORMAL (CHAT)
+# 10. MODO NORMAL (CHAT)
 # ==========================================
 if not st.session_state.modo_profesor:
     # Mostrar mensajes
@@ -241,7 +233,7 @@ if not st.session_state.modo_profesor:
             st.markdown(message["content"])
     
     # ==========================================
-    # 12. DETECCIÓN DE EVALUACIONES
+    # 11. DETECCIÓN DE EVALUACIONES
     # ==========================================
     PALABRAS_EVALUACION = [
         "examen", "evaluación", "prueba", "cuestionario",
@@ -252,7 +244,7 @@ if not st.session_state.modo_profesor:
         return any(palabra in pregunta.lower() for palabra in PALABRAS_EVALUACION)
     
     # ==========================================
-    # 13. LÓGICA DINÁMICA DE TOKENS
+    # 12. LÓGICA DINÁMICA DE TOKENS
     # ==========================================
     def calcular_max_tokens(pregunta: str) -> int:
         pregunta_lower = pregunta.lower()
@@ -273,7 +265,7 @@ if not st.session_state.modo_profesor:
             return 2048
     
     # ==========================================
-    # 14. SYSTEM INSTRUCTION
+    # 13. SYSTEM INSTRUCTION
     # ==========================================
     def get_system_instruction():
         return f"""Eres Aura, tutora de Derecho del Trabajo del EDA creado por el Prof. Luis Ignacio Chirinos Campos.
@@ -290,7 +282,7 @@ REGLAS:
 """
     
     # ==========================================
-    # 15. INPUT Y PROCESAMIENTO
+    # 14. INPUT Y PROCESAMIENTO
     # ==========================================
     prompt = st.chat_input("Escribe tu consulta jurídica aquí...")
     
@@ -366,7 +358,7 @@ REGLAS:
                         registrar_consulta(prompt, f"ERROR: {str(e)[:100]}")
 
 # ==========================================
-# 16. MODO PROFESOR
+# 15. MODO PROFESOR
 # ==========================================
 else:
     st.markdown('<div class="panel-profesor">', unsafe_allow_html=True)
