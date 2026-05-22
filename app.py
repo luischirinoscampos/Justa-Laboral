@@ -192,7 +192,7 @@ st.markdown("""
 # ==========================================
 st.markdown("""
     <div class="custom-header">
-        <div class="line-1">✨ Aura</div>
+        <div class="line-1">Aura</div>
         <div class="line-2">Tutora Académica en Línea</div>
         <div class="line-3">Unidad Curricular: Derecho del Trabajo</div>
         <div class="line-4">Desarrollador: Prof. Luis Ignacio Chirinos Campos</div>
