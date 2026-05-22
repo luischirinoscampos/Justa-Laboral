@@ -19,7 +19,7 @@ ARCHIVO_BITACORA = "consultas_local.csv"
 ARCHIVO_CONOCIMIENTO = "vector_store.json"
 
 # ==========================================
-# 2. FUNCIÓN PARA REINICIAR CONVERSACIÓN
+# 2. FUNCIÓN PARA REINICIAR CONVERSACIÓN (VERSIÓN BREVE Y CÁLIDA)
 # ==========================================
 def reiniciar_conversacion():
     st.session_state.messages = [
@@ -27,17 +27,14 @@ def reiniciar_conversacion():
             "role": "assistant",
             "avatar": "✨",
             "content": (
-                "📍 ¡Hola! Soy **Aura**, tu tutora académica en Derecho del Trabajo.\n\n"
-                "Pertenezco al **Ecosistema Digital de Aprendizaje (EDA)** de esta unidad curricular, "
-                "creada y desarrollada por el **Prof. Luis Ignacio Chirinos Campos**.\n\n"
-                "Estoy aquí para acompañarte en tu **aprendizaje** con claridad, calidez y rigor jurídico.\n\n"
-                "🛠️ **¿Qué puedo hacer por ti?**\n"
-                "- Resolver dudas sobre los contenidos de la unidad\n"
-                "- Explicar conceptos jurídicos complejos de forma sencilla\n"
-                "- Ayudarte a preparar tus estudios\n"
-                "- Orientarte en casos prácticos\n\n"
-                "⚠️ **Importante**: No puedo ayudarte a resolver exámenes o evaluaciones.\n\n"
-                "Cuéntame, ¿qué tema o consulta académica te trae hoy? 💬"
+                "📍 ¡Hola! Soy **Aura**, tu tutora de Derecho del Trabajo.\n\n"
+                "Pertenezco al **EDA** creado por el **Prof. Luis Ignacio Chirinos Campos**.\n\n"
+                "🛠️ **¿Cómo puedo apoyarte?**\n"
+                "- Aclarar dudas\n"
+                "- Explicar conceptos\n"
+                "- Guiar tu estudio\n\n"
+                "⚠️ No resuelvo exámenes. Mi propósito es tu **aprendizaje genuino**.\n\n"
+                "Cuéntame, ¿qué inquietud académica te trae hoy? 💬"
             )
         }
     ]
@@ -103,7 +100,7 @@ def registrar_consulta(pregunta: str, respuesta: str):
         pass
 
 # ==========================================
-# 6. ESTILOS CSS LIMPIOS
+# 6. ESTILOS CSS
 # ==========================================
 st.markdown("""
     <style>
@@ -117,23 +114,25 @@ st.markdown("""
         color: #0A2540 !important;
     }
     
-    /* Header simple */
+    /* Header compacto */
     .custom-header {
         text-align: center;
-        margin-bottom: 20px;
+        margin-bottom: 10px;
+        padding-bottom: 5px;
     }
     .line-1 {
-        font-size: 2rem;
+        font-size: 1.8rem;
         font-weight: 700;
         color: #0A2540 !important;
+        margin-bottom: 0px;
     }
     .line-2 {
-        font-size: 1rem;
+        font-size: 0.9rem;
         font-weight: 500;
         color: #1A3A5C !important;
     }
     .line-3 {
-        font-size: 0.85rem;
+        font-size: 0.75rem;
         color: #4A5568 !important;
     }
     
@@ -149,7 +148,7 @@ st.markdown("""
         background-color: transparent !important;
         color: #4A5568 !important;
         font-size: 1.2rem !important;
-        padding: 4px 12px !important;
+        padding: 2px 10px !important;
         border: 1px solid #CBD5E1 !important;
         border-radius: 8px !important;
     }
@@ -159,33 +158,46 @@ st.markdown("""
         border-color: #0A2540 !important;
     }
     
-    /* Ocultar elementos de Streamlit */
+    /* Ocultar elementos */
     #MainMenu, footer, header, [data-testid="stToolbar"] {
         display: none !important;
     }
     
     /* Panel del profesor */
     .panel-profesor {
-        margin-top: 30px;
-        padding: 20px;
-        border-top: 2px solid #E2E8F0;
+        margin-top: 20px;
+        padding: 15px;
+        border-top: 1px solid #E2E8F0;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 7. HEADER SIMPLE (SIN ICONO EXTRA)
+# 7. HEADER COMPACTO
 # ==========================================
 st.markdown("""
     <div class="custom-header">
-        <div class="line-1">Aura</div>
+        <div class="line-1">✨ Aura</div>
         <div class="line-2">Tutora Académica en Línea</div>
         <div class="line-3">Derecho del Trabajo | EDA - UCLA</div>
     </div>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 8. INICIALIZACIÓN
+# 8. SIDEBAR CON CRÉDITOS
+# ==========================================
+with st.sidebar:
+    st.markdown("---")
+    st.caption("📌 **Desarrollador**")
+    st.caption("Prof. Luis Ignacio Chirinos Campos")
+    st.caption("UCLA - Decanato de Ciencias Económicas y Empresariales")
+    st.markdown("---")
+    st.caption(f"📅 {datetime.now().strftime('%d/%m/%Y')}")
+    st.caption("⚡ Respuestas basadas en material de la cátedra")
+    st.caption("⏱️ 15 segundos entre consultas")
+
+# ==========================================
+# 9. INICIALIZACIÓN
 # ==========================================
 if "messages" not in st.session_state:
     reiniciar_conversacion()
@@ -200,7 +212,7 @@ if "profesor_autenticado" not in st.session_state:
     st.session_state.profesor_autenticado = False
 
 # ==========================================
-# 9. BOTONES EN EXTREMOS (TRES COLUMNAS)
+# 10. BOTONES EN EXTREMOS
 # ==========================================
 col_izq, col_centro, col_der = st.columns([1, 10, 1])
 
@@ -219,10 +231,8 @@ with col_der:
         reiniciar_conversacion()
         st.rerun()
 
-st.markdown("<br>", unsafe_allow_html=True)
-
 # ==========================================
-# 10. MODO NORMAL (CHAT)
+# 11. MODO NORMAL (CHAT)
 # ==========================================
 if not st.session_state.modo_profesor:
     # Mostrar mensajes
@@ -231,7 +241,7 @@ if not st.session_state.modo_profesor:
             st.markdown(message["content"])
     
     # ==========================================
-    # 11. DETECCIÓN DE EVALUACIONES
+    # 12. DETECCIÓN DE EVALUACIONES
     # ==========================================
     PALABRAS_EVALUACION = [
         "examen", "evaluación", "prueba", "cuestionario",
@@ -242,7 +252,7 @@ if not st.session_state.modo_profesor:
         return any(palabra in pregunta.lower() for palabra in PALABRAS_EVALUACION)
     
     # ==========================================
-    # 12. LÓGICA DINÁMICA DE TOKENS
+    # 13. LÓGICA DINÁMICA DE TOKENS
     # ==========================================
     def calcular_max_tokens(pregunta: str) -> int:
         pregunta_lower = pregunta.lower()
@@ -263,10 +273,10 @@ if not st.session_state.modo_profesor:
             return 2048
     
     # ==========================================
-    # 13. SYSTEM INSTRUCTION
+    # 14. SYSTEM INSTRUCTION
     # ==========================================
     def get_system_instruction():
-        return f"""Eres Aura, tutora de Derecho del Trabajo.
+        return f"""Eres Aura, tutora de Derecho del Trabajo del EDA creado por el Prof. Luis Ignacio Chirinos Campos.
 
 CONTEXTO:
 {CONTEXTO_BASE}
@@ -275,12 +285,12 @@ REGLAS:
 - Sé clara, cálida y pedagógica.
 - Usa **negritas** para conceptos clave.
 - NO ayudas a resolver exámenes.
-- NO uses fórmulas LaTeX ($$). Usa solo Markdown normal.
-- Si te piden "explicación fácil", usa ejemplos cotidianos.
+- NO uses fórmulas LaTeX ($$).
+- Responde de forma CONCISA (máximo 3 párrafos).
 """
     
     # ==========================================
-    # 14. INPUT Y PROCESAMIENTO
+    # 15. INPUT Y PROCESAMIENTO
     # ==========================================
     prompt = st.chat_input("Escribe tu consulta jurídica aquí...")
     
@@ -296,15 +306,13 @@ REGLAS:
             st.session_state.messages.append({"role": "user", "avatar": "👤", "content": prompt})
             
             with st.chat_message("assistant", avatar="✨"):
-                # Bloquear evaluación
                 if es_intento_evaluacion(prompt):
-                    respuesta = "📚 **Lo siento, no puedo ayudarte con evaluaciones.** Estoy para apoyar tu aprendizaje."
+                    respuesta = "📚 **Lo siento, no puedo ayudarte con evaluaciones.**"
                     st.markdown(respuesta)
                     st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta})
                     registrar_consulta(prompt, "[BLOQUEADO]")
                     st.stop()
                 
-                # Verificar caché
                 cache = obtener_cache(prompt)
                 if cache:
                     st.markdown(cache)
@@ -329,7 +337,6 @@ REGLAS:
                             max_output_tokens=max_tokens
                         )
                         
-                        # Reintentos silenciosos
                         respuesta_texto = None
                         for intento in range(3):
                             try:
@@ -344,7 +351,7 @@ REGLAS:
                                 if intento < 2 and ("503" in str(e) or "UNAVAILABLE" in str(e)):
                                     time.sleep(1)
                                 else:
-                                    respuesta_texto = "📚 **Aura está recibiendo muchas consultas.** Espera 1 minuto e intenta de nuevo."
+                                    respuesta_texto = "📚 **Aura está recibiendo muchas consultas.** Espera 1 minuto."
                         
                         st.markdown(respuesta_texto)
                         st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta_texto})
@@ -359,7 +366,7 @@ REGLAS:
                         registrar_consulta(prompt, f"ERROR: {str(e)[:100]}")
 
 # ==========================================
-# 15. MODO PROFESOR
+# 16. MODO PROFESOR
 # ==========================================
 else:
     st.markdown('<div class="panel-profesor">', unsafe_allow_html=True)
