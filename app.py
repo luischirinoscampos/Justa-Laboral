@@ -150,7 +150,6 @@ st.markdown("""
         border-radius: 12px !important;
     }
     
-    /* Estilo base para botones */
     .stButton button {
         background-color: transparent !important;
         color: #4A5568 !important;
@@ -166,18 +165,6 @@ st.markdown("""
         color: #0A2540 !important;
         background-color: #F8FAFC !important;
         border-color: #0A2540 !important;
-    }
-    
-    /* Forzar primera columna a la izquierda */
-    div[data-testid="column"]:first-child {
-        display: flex;
-        justify-content: flex-start;
-    }
-    
-    /* Forzar última columna a la derecha */
-    div[data-testid="column"]:last-child {
-        display: flex;
-        justify-content: flex-end;
     }
     
     #MainMenu, footer, header, [data-testid="stToolbar"] {
@@ -223,9 +210,9 @@ if "profesor_autenticado" not in st.session_state:
     st.session_state.profesor_autenticado = False
 
 # ==========================================
-# 9. BOTONES SUPERIORES (FORZADO CON CSS)
+# 9. BOTONES SUPERIORES (EN EXTREMOS - TRES COLUMNAS)
 # ==========================================
-col_izq, col_der = st.columns([1, 20])
+col_izq, col_centro, col_der = st.columns([1, 18, 1])
 
 with col_izq:
     if st.button("🔒", key="btn_profesor", help="Acceso profesor"):
@@ -241,6 +228,8 @@ with col_der:
     if st.button("🔄", key="btn_reinicio", help="Reiniciar conversación"):
         reiniciar_conversacion()
         st.rerun()
+
+# col_centro queda vacío
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -357,6 +346,7 @@ REGLAS:
                         max_output_tokens=max_tokens
                     )
                     
+                    # REINTENTOS SILENCIOSOS ANTE ERROR 503
                     reintentos = 0
                     exito = False
                     respuesta_texto = None
@@ -374,18 +364,21 @@ REGLAS:
                             error_str = str(e)
                             reintentos += 1
                             if reintentos < 3 and ("503" in error_str or "UNAVAILABLE" in error_str or "RESOURCE_EXHAUSTED" in error_str or "429" in error_str):
-                                time.sleep(1)
-                                continue
+                                time.sleep(1)  # Espera silenciosa
+                                continue  # Reintentar
                             else:
+                                # Si es el último reintento o error diferente, mostrar mensaje amigable
                                 if "503" in error_str or "UNAVAILABLE" in error_str or "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
                                     respuesta_texto = "📚 **Aura está recibiendo muchas consultas en este momento.** Por favor, espera 1 minuto y vuelve a intentar. Tu pregunta es importante."
                                 else:
                                     respuesta_texto = f"⚠️ Error técnico: {error_str[:150]}"
-                                exito = True
+                                exito = True  # Salir del bucle con mensaje de error
                     
+                    # Mostrar respuesta (éxito o mensaje amigable)
                     st.markdown(respuesta_texto)
                     st.session_state.messages.append({"role": "assistant", "avatar": "✨", "content": respuesta_texto})
                     
+                    # Guardar en caché solo si fue una respuesta exitosa (no mensaje de error)
                     if respuesta_texto and not respuesta_texto.startswith(("📚", "⚠️")):
                         guardar_cache(prompt, respuesta_texto)
                     
